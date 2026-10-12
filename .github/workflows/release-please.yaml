@@ -1,0 +1,28 @@
+name: Release
+
+# release-please keeps a release PR open against main that bumps version/version.go, .release-please-manifest.json and CHANGELOG.md from the Conventional Commits merged since the last release. Merging that PR makes the next run on main tag vX.Y.Z and publish the GitHub release; the tag is what `go get ...@vX.Y.Z` resolves. Configuration lives in release-please-config.json; see AGENTS.md.
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+# Runs queue rather than cancel: a cancelled run could leave a release tagged without its GitHub release.
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Release PR & tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # commit to the release branch, create tags and releases
+      pull-requests: write # open and update the release PR
+      issues: write # label the release PR (labels use the issues API)
+    steps:
+      # RELEASE_PLEASE_TOKEN (a fine-grained PAT or GitHub App token) is optional. Without it the built-in token is used, and GitHub does not start workflows for events that token causes, so CI does not run on the release PR.
+      - uses: googleapis/release-please-action@v5
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}

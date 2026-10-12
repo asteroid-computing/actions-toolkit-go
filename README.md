@@ -42,3 +42,5 @@ func main() {
 ## Developing
 
 Tooling follows the [walle pattern](https://github.com/asteroid-computing/go-walle-bootstrap): `./walle --help` lists the tasks, and `./walle check` is the gate CI runs. [AGENTS.md](AGENTS.md) has the layout, rules and conventions.
+
+Releases are cut by [release-please](https://github.com/googleapis/release-please) from [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) on main: merging its release PR tags `vX.Y.Z` and publishes the GitHub release. See [CHANGELOG.md](CHANGELOG.md) once the first release is out.

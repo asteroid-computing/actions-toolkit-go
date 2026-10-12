@@ -36,10 +36,12 @@ internal/buildscope/          component registry + build-closure engine (go list
 internal/buildrun/            build engine: the one `go build` command line, platforms, metadata, action binaries
 internal/cireport/            job-summary markdown for the actions
 internal/gocache/             trims the Go build cache to a CI run's working set before it is saved
-version/                      Version const + BuildMetadata (set via -ldflags -X)
+version/                      Version const (bumped by release-please) + BuildMetadata (set via -ldflags -X)
 .github/actions/_shim/shim.js shared node launcher for every Go action
 .github/actions/<name>/       action.yaml + one-line index.js (+ optional committed dist/)
 .github/workflows/ci.yaml     single-job CI: changed-scope → fmt/tidy → vet/test → build → check actions
+.github/workflows/release-please.yaml  release PR, tag and GitHub release on push to main
+release-please-config.json    release-please configuration; .release-please-manifest.json records the last released version
 ```
 
 ## Three layers, one direction
@@ -93,7 +95,7 @@ Build metadata comes from `buildrun.Metadata`: `BUILD_METADATA` if set, else `pr
 
 ## Commits
 
-Use [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/): `<type>(<scope>): <subject>`. The history then says what kind of change each commit is, and release tooling (e.g. release-please) can derive the version bump and changelog from it.
+Use [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/): `<type>(<scope>): <subject>`. The history then says what kind of change each commit is, and release-please derives the version bump and changelog from it (see Releases). Pull requests are usually squash-merged, so the PR title is the commit release-please reads: it must follow these rules too.
 
 - **Types:** `feat` (new capability), `fix` (bug fix), `perf`, `refactor` (no behaviour change), `test`, `docs`, `build` (go.mod, build flags, the wrapper), `ci` (workflows and actions plumbing), `chore` (anything else).
 - **Scope:** the package, component or engine touched — `core`, `actioncontext`, `walle`, `buildscope`, `buildrun`, `gocache`, `gocmd`, `cireport`, `actions`, `ci`, or a component name such as `example`. Omit it when a change spans the repository.
@@ -101,6 +103,23 @@ Use [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/)
 - **Body:** say why, not what the diff already shows. Wrap nothing; one paragraph per line.
 - **Breaking changes:** `!` after the type or scope (`feat(core)!: return an error from Debug`) plus a `BREAKING CHANGE:` footer describing the migration. A changed exported library API (including a go-github major bump), or a renamed walle command, action input or output, is breaking.
 - **One logical change per commit.** An engine change and the walle command that exposes it may share a commit; unrelated cleanups do not. Committed action binaries (`dist/`) go in their own `build(actions): rebuild action binaries` commit.
+
+## Releases
+
+[release-please](https://github.com/googleapis/release-please) runs from `.github/workflows/release-please.yaml` ([googleapis/release-please-action](https://github.com/googleapis/release-please-action)) on every push to main:
+
+1. It keeps one release PR open (`chore(main): release X.Y.Z`) that sets `version.Version` in `version/version.go`, the `.` entry in `.release-please-manifest.json`, and prepends the release's section to `CHANGELOG.md`. Each push to main updates it.
+2. Merging the release PR makes the next run tag the merge commit `vX.Y.Z` and publish a GitHub release with the changelog section as its notes. The tag is the release: Go resolves `go get github.com/asteroid-computing/actions-toolkit-go@vX.Y.Z` from it.
+
+The version comes from the commits since the last release: `feat` bumps minor, `fix`/`perf`/`revert` bump patch, and the other types (`docs`, `build`, `ci`, `chore`, `refactor`, `test`, `style`) neither trigger a release nor appear in the changelog unless marked breaking. While the version is below 1.0.0, `bump-minor-pre-major` makes a breaking change bump minor rather than jump to 1.0.0; ship 1.0.0 deliberately with `Release-As: 1.0.0` in a commit body. Settings in `release-please-config.json` that are not defaults, and why:
+
+- `release-type: go` with `version-file: version/version.go` — rewrites the `const Version = "X.Y.Z"` line; keep that line's form, or the bump silently stops. `TestVersionMatchesReleaseManifest` fails if the const and the manifest disagree.
+- `include-component-in-tag: false` — tags are `vX.Y.Z`, the form Go module versions require (the manifest default would be `actions-toolkit-go-vX.Y.Z`).
+- `initial-version: 0.1.0` — the first release, which the empty manifest means has not happened yet. release-please's own default is 1.0.0. It has no effect once the manifest records a version.
+
+Never edit `version.Version`, the manifest or `CHANGELOG.md` by hand, and never push a `v*` tag yourself; release-please would lose track of the last release.
+
+Without a `RELEASE_PLEASE_TOKEN` secret the workflow uses the built-in `GITHUB_TOKEN`. That needs the repository setting _Allow GitHub Actions to create and approve pull requests_ (Settings → Actions → General), and GitHub does not start workflows for events that token causes, so CI does not run on the release PR or the tag. Set `RELEASE_PLEASE_TOKEN` to a fine-grained PAT or GitHub App token (contents, pull requests and issues: read and write) to get CI on release PRs.
 
 ## How to…
 
