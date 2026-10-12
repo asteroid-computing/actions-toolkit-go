@@ -1,6 +1,6 @@
 // Package gocmd runs child processes — mostly the go toolchain — for walle and the Go GitHub Actions.
 //
-// It is the one place the project's child-process environment is decided. [Env] holds the overrides every go invocation needs (in fenton that was GOEXPERIMENT=jsonv2, set separately in the wrapper script, mise.toml, an init(), a goEnv() helper, buildrun and buildscope). Put such a setting here once and every build, vet, test and `go list` inherits it.
+// It is the one place the project's child-process environment is decided. [Env] holds the overrides every go invocation needs. Put such a setting here once and every build, vet, test and `go list` inherits it.
 //
 // Every function takes a context so Ctrl-C (walle wires signal.NotifyContext) or a cancelled errgroup stops the child instead of orphaning it.
 package gocmd

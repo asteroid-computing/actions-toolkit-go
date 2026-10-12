@@ -12,7 +12,7 @@ import (
 
 // updateCmd upgrades every direct dependency with a newer version, in one `go get`, then tidies.
 //
-// Unlike fenton's version it does not run `go clean -modcache -cache` first: those caches are shared by every Go project on the machine, so clearing them costs every other checkout a full re-download and recompile to work around a rare `go get` verification failure. If that failure occurs, clear the caches by hand.
+// It does not run `go clean -modcache -cache` first: those caches are shared by every Go project on the machine, so clearing them costs every other checkout a full re-download and recompile to work around a rare `go get` verification failure. If that failure occurs, clear the caches by hand.
 type updateCmd struct {
 	Yes bool `short:"y" help:"Upgrade without asking."`
 }

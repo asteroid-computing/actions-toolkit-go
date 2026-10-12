@@ -6,6 +6,8 @@ A toolkit for writing GitHub Actions in Go, patterned after the JavaScript [acti
 go get github.com/asteroid-computing/actions-toolkit-go
 ```
 
+The repository is private: set `GOPRIVATE=github.com/asteroid-computing` so the go command fetches it directly with your git credentials instead of through the public module proxy.
+
 ## Packages
 
 - **`core`** — inputs (`GetInput`, `GetBooleanInput`, `GetMultilineInput`), outputs and file commands (`SetOutput`, `SetEnv`, `SetState`, `AddToPath`), workflow commands (`Debug`, `Notice`, `Warning`, `Error`, `StartGroup`/`EndGroup`, `MaskValue`, `StopCommands`) and the job summary builder (`StepSummary`).

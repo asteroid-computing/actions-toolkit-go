@@ -44,7 +44,7 @@ func main() {
 	k := kong.Parse(&cli,
 		kong.Name("walle"),
 		kong.Description("The project's developer task runner. Run as ./walle <command> from anywhere in the repository."),
-		// kong renders grouped help natively; fenton's 300-line custom printer predates relying on this.
+		// kong renders grouped help natively, so no custom help printer is needed.
 		kong.Groups{
 			"develop":  "Develop:",
 			"build":    "Build:",

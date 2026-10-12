@@ -91,7 +91,7 @@ type checkCmd struct {
 	Actions     checkActionsCmd     `cmd:"" help:"Fail if a committed action binary under .github/actions/*/dist does not match its source."`
 }
 
-// checkGateCmd is what CI runs and what to run before pushing. Nothing in it modifies the tree: fenton's gate ran a mutating `go mod tidy`, which passes locally and leaves the fix uncommitted.
+// checkGateCmd is what CI runs and what to run before pushing. Nothing in it modifies the tree: a mutating `go mod tidy` would pass locally and leave the fix uncommitted.
 type checkGateCmd struct {
 	Components []string `sep:"," enum:"${components}" help:"Scope vet and tests to these components (${components}). Format and tidy checks always cover the whole module."`
 }

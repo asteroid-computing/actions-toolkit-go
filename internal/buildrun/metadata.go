@@ -15,7 +15,7 @@ import (
 //  2. in GitHub Actions: "pr<N>.<sha7>" for a pull request (the PR head, not the synthetic merge commit), "main.<sha7>" on main, "branch.<sha7>" otherwise;
 //  3. locally: "local.<sha7>", with ".dirty" for an uncommitted tree, or "local.unknown" outside git.
 //
-// It is one implementation for walle and the build action, replacing fenton's separate bash build-metadata action and Go localMetadata. It never contains a timestamp or run id: rebuilding the same commit must produce the same bytes.
+// It is one implementation for walle and the build action. It never contains a timestamp or run id: rebuilding the same commit must produce the same bytes.
 func Metadata(ctx context.Context) string {
 	if m := os.Getenv("BUILD_METADATA"); m != "" {
 		return m

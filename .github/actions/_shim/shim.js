@@ -1,6 +1,6 @@
 // Shared launcher for the Go GitHub Actions. Each action's index.js is one line: require("../_shim/shim.js")(__dirname).
 //
-// The action name is the directory name, so it can never disagree with the binary name (fenton hard-coded APP_NAME in a copy of this file per action).
+// The action name is the directory name, so it can never disagree with the binary name.
 //
 // Two delivery modes, chosen per runner platform:
 //   1. Binary mode — dist/<name>_<os>_<arch> exists (committed by `./walle build actions`): exec it. Zero compile cost in CI.
