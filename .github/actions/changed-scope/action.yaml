@@ -1,0 +1,24 @@
+name: Changed Scope
+description: >-
+  Report which release components a change touched, by intersecting the files
+  changed since the merge base with `base` against each component's go list
+  build closure. Implemented in Go: cmd/github-actions/changed-scope.
+  Needs actions/checkout with fetch-depth 0 and actions/setup-go.
+
+inputs:
+  base:
+    description: "Commit or ref to diff against (merge base with HEAD). Defaults to the PR base, or the push's previous commit. Empty or all-zero means every component is affected."
+    required: false
+    default: ${{ github.event.pull_request.base.sha || github.event.before }}
+
+outputs:
+  components:
+    description: "Comma-separated affected components in canonical order, e.g. 'example'. Empty if none."
+  components-json:
+    description: "Affected components as a JSON array, for contains(fromJSON(...), 'name')."
+  any:
+    description: "'true' if any component is affected."
+
+runs:
+  using: node24
+  main: index.js

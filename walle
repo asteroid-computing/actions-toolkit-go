@@ -1,0 +1,9 @@
+#!/bin/sh
+# walle — the project's developer task runner. `./walle --help` lists every command.
+#
+# The tasks live in cmd/walle (plain Go); this wrapper only saves typing and lets you run it from any directory in the repository. It needs nothing but the Go toolchain. Since Go 1.24, `go run` caches the linked executable, so a repeat invocation with unchanged sources skips compiling and linking.
+#
+# Project-wide go environment (GOEXPERIMENT, GOPRIVATE, ...) belongs in internal/gocmd.Env, not here: CI and the Go actions do not run this script.
+set -e
+cd "$(dirname "$0")"
+exec go run ./cmd/walle "$@"
