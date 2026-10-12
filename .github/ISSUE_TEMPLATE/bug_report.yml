@@ -1,0 +1,33 @@
+name: Bug report
+description: Something in the toolkit behaves differently from its documentation or from GitHub Actions.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not report security vulnerabilities here; see SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Toolkit version
+      placeholder: v0.1.0
+    validations:
+      required: true
+  - type: input
+    id: go
+    attributes:
+      label: Go version and runner
+      placeholder: go1.27.2, ubuntu-24.04 GitHub-hosted runner
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: Code, workflow YAML or event payload that shows the problem.
+      render: go

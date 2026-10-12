@@ -61,7 +61,16 @@ func GetLinuxOsInfo() (OsVersionInfo, error) {
 		return OsVersionInfo{}, fmt.Errorf("error getting Linux OS Info: %w", err)
 	}
 
-	parts := strings.Split(strings.TrimSpace(string(infoStr)), "\n")
+	return parseLsbRelease(string(infoStr))
+}
+
+// parseLsbRelease parses the output of `lsb_release -i -r -s`: the distributor ID and the release, one per line.
+// It returns an error rather than panicking when either line is missing.
+func parseLsbRelease(out string) (OsVersionInfo, error) {
+	parts := strings.Split(strings.TrimSpace(out), "\n")
+	if len(parts) < 2 {
+		return OsVersionInfo{}, fmt.Errorf("error getting Linux OS Info: unexpected lsb_release output %q", out)
+	}
 
 	return OsVersionInfo{
 		Name:    strings.TrimSpace(parts[0]),

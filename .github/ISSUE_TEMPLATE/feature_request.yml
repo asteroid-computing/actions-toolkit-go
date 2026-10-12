@@ -1,0 +1,17 @@
+name: Feature request
+description: Propose a capability, e.g. something the JavaScript actions/toolkit offers that this one lacks.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The action you are writing and what the toolkit makes hard today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed API
+      description: Optional. A sketch of the function or type, and its JS toolkit equivalent if there is one.
+      render: go
