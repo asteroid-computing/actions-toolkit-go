@@ -119,7 +119,7 @@ The version comes from the commits since the last release: `feat` bumps minor, `
 
 Never edit `version.Version`, the manifest or `CHANGELOG.md` by hand, and never push a `v*` tag yourself; release-please would lose track of the last release.
 
-Without a `RELEASE_PLEASE_TOKEN` secret the workflow uses the built-in `GITHUB_TOKEN`. That needs the repository setting _Allow GitHub Actions to create and approve pull requests_ (Settings → Actions → General), and GitHub does not start workflows for events that token causes, so CI does not run on the release PR or the tag. Set `RELEASE_PLEASE_TOKEN` to a fine-grained PAT or GitHub App token (contents, pull requests and issues: read and write) to get CI on release PRs.
+release-please acts as the org's `astrocompute-release-please` GitHub App, not with the built-in `GITHUB_TOKEN`: GitHub does not start workflows for events that `GITHUB_TOKEN` causes, so CI would never run on the release PR. `actions/create-github-app-token` mints an installation token from the org secrets `RELEASE_PLEASE_CLIENT_ID` and `RELEASE_PLEASE_PRIVATE_KEY`, scoped to this repository with contents, pull requests and issues write, and revoked when the job ends. Both secrets are visible only to selected repositories, so a repository using this setup must be added to their repository access list (the App itself is installed on every org repository).
 
 ## How to…
 
