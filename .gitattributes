@@ -1,0 +1,2 @@
+# Committed Go action binaries: never diff or merge them, and hide them from language stats and PR diffs.
+.github/actions/*/dist/** binary linguist-generated

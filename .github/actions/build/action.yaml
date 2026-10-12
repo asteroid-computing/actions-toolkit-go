@@ -1,0 +1,27 @@
+name: Build
+description: >-
+  Compile release components in the caller's job with internal/buildrun — the
+  same code ./walle build runs — and write the outcome to the job summary.
+  Implemented in Go: cmd/github-actions/build. Needs actions/setup-go.
+
+inputs:
+  components:
+    description: "Comma-separated components to build. Empty builds nothing (and says so in the summary)."
+    required: false
+    default: ""
+  all-platforms:
+    description: "'true' to cross-compile for every release platform instead of the runner's."
+    required: false
+    default: "false"
+  metadata:
+    description: "Build metadata (semver +build suffix). Default: derived from the event, e.g. pr45.abc1234 or main.abc1234."
+    required: false
+    default: ""
+
+outputs:
+  built:
+    description: "Comma-separated components that built successfully."
+
+runs:
+  using: node24
+  main: index.js

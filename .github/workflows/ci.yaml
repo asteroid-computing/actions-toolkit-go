@@ -1,0 +1,107 @@
+name: CI
+
+# One job: decide what a change touched, then validate and build only that.
+#
+# One job rather than one per component because a Go build's cost is dominated by compiling the third-party dependency tree, which every component shares. A job per component pays checkout, toolchain setup and cache restore again, and recompiles that tree again; one job pays once, and after `vet` has compiled a component's closure its build is a cache hit.
+#
+# The logic lives in Go, not YAML: the changed-scope and build actions (cmd/github-actions) import the same internal packages walle uses, so CI and `./walle changed --base origin/main` / `./walle build` cannot disagree.
+
+on:
+  pull_request:
+  # Pushes to main exist to seed the Go cache. A pull request can restore caches saved by its own branch or the default branch, never by another PR — so a cache saved only from PR runs never helps the next PR.
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  ci:
+    name: Validate & build
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth 0 so changed-scope can find the merge base with the PR base.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # A range rather than an exact version, so a runner image that already has a matching Go uses it instead of downloading one (~9s). go.mod's go directive still enforces the minimum at compile time. cache: false because the step below manages both Go caches with a key it controls.
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ">=1.27.2"
+          cache: false
+
+      # The cache key is built from what actually determines the cache's contents: OS, arch and the exact Go version (build-cache entries from another toolchain or architecture are useless), go.sum, and finally the run id. The run id makes every save a new, immutable entry, so the cache is refreshed on every main run instead of freezing until go.sum next changes; restore-keys pick the newest entry by prefix. Paths come from go env rather than being hard-coded, so they are right on any runner OS.
+      - name: Go cache parameters
+        id: go
+        run: |
+          echo "version=$(go env GOVERSION)" >> "$GITHUB_OUTPUT"
+          echo "gocache=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "gomodcache=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          echo "start=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Go caches
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ${{ steps.go.outputs.gocache }}
+            ${{ steps.go.outputs.gomodcache }}
+          key: go-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.version }}-${{ hashFiles('go.sum') }}-${{ github.run_id }}
+          restore-keys: |
+            go-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.version }}-${{ hashFiles('go.sum') }}-
+            go-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.version }}-
+
+      # On a PR, scope to what it changed. On main, an empty base puts every component in scope: main runs seed the cache that PRs restore, and the trim below keeps only what a run used, so a scoped main run would trim away the other components' compile output.
+      - name: Determine changed scope
+        id: scope
+        uses: ./.github/actions/changed-scope
+        with:
+          base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+
+      - name: Format & tidy
+        run: |
+          ./walle fmt --check
+          ./walle tidy --check
+
+      # Step outputs reach the shell through env, never ${{ }} inside run: a templated value is pasted into the script before the shell parses it, so a crafted value could inject commands.
+      - name: Vet
+        if: steps.scope.outputs.any == 'true'
+        env:
+          COMPONENTS: ${{ steps.scope.outputs.components }}
+        run: ./walle vet --components "$COMPONENTS"
+
+      - name: Test (race)
+        if: steps.scope.outputs.any == 'true'
+        env:
+          COMPONENTS: ${{ steps.scope.outputs.components }}
+        run: ./walle test --race --components "$COMPONENTS"
+
+      # Runs after vet so the build reuses the archives vet compiled. Writes its own job summary; an empty input builds nothing and says so.
+      - name: Build
+        uses: ./.github/actions/build
+        with:
+          components: ${{ steps.scope.outputs.components }}
+
+      # A no-op until action binaries are committed; then it fails if any no longer match their source.
+      - name: Committed action binaries match source
+        run: ./walle check actions
+
+      # Save only from main (see `on:`). PRs are restore-only, which bounds storage to one entry per main run; GitHub evicts the least recently used entries beyond the repository's cache limit. The trim drops build-cache entries this run did not use, so each saved entry is the working set rather than every compile output since the cache was first created. Steps run only on success, so a failed run never saves.
+      - name: Trim Go build cache to this run's working set
+        if: github.event_name == 'push'
+        env:
+          START: ${{ steps.go.outputs.start }}
+        run: ./walle cache trim --since "$START"
+
+      - name: Save Go caches
+        if: github.event_name == 'push'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ${{ steps.go.outputs.gocache }}
+            ${{ steps.go.outputs.gomodcache }}
+          key: go-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.version }}-${{ hashFiles('go.sum') }}-${{ github.run_id }}
