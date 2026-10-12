@@ -11,6 +11,7 @@ require (
 )
 
 require (
+	github.com/alecthomas/repr v0.5.4 // indirect
 	github.com/google/go-querystring v1.2.0 // indirect
-	golang.org/x/text v0.35.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
 )
