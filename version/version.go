@@ -6,7 +6,7 @@ package version
 import "reflect"
 
 // Version is the semantic version, without a leading "v".
-const Version = "0.1.0"
+const Version = "0.1.1"
 
 // BuildMetadata is set at link time (e.g. "pr45.abc1234", "local.abc1234.dirty"). Empty under `go run`.
 var BuildMetadata string
