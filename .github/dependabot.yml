@@ -1,0 +1,26 @@
+# Weekly dependency updates, grouped into one PR per ecosystem so CI and review run once per batch.
+# Commit messages follow the repository's Conventional Commits rules (AGENTS.md): build(deps) for Go modules, ci(deps) for workflow actions. Neither type triggers a release; a dependency fix users need ships with the next fix or feat.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      go-modules:
+        patterns: ["*"]
+
+  # Workflow actions are pinned to commit SHAs with a version comment; Dependabot updates both.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      github-actions:
+        patterns: ["*"]

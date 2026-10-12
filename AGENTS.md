@@ -3,7 +3,7 @@
 This repository is two things:
 
 1. **The library** — a toolkit for writing GitHub Actions in Go, patterned after (not a copy of) the JavaScript [actions/toolkit](https://github.com/actions/toolkit): `core` (inputs, outputs, env/path/state file commands, workflow commands, job summary) and `actioncontext` (the run's context from the default environment variables plus the typed event payload, and a GitHub API client for the run's host).
-2. **The tooling** — the walle pattern from [go-walle-bootstrap](https://github.com/asteroid-computing/go-walle-bootstrap): developer tooling and CI logic written in Go, not in Makefiles, shell scripts or workflow YAML. The repository's own Go actions are built on the library, so CI dogfoods it.
+2. **The tooling** — the walle pattern: developer tooling and CI logic written in Go, not in Makefiles, shell scripts or workflow YAML. The repository's own Go actions are built on the library, so CI dogfoods it.
 
 These rules are binding for humans and agents working here.
 
@@ -86,6 +86,7 @@ Build metadata comes from `buildrun.Metadata`: `BUILD_METADATA` if set, else `pr
 - **CI logic is Go.** A workflow step may call `./walle <cmd>` or a Go action. Anything beyond a one-line invocation (parsing, branching, loops, string assembly) goes into `internal/` with a test. Pass step outputs to `run:` through `env:`, never `${{ }}` inside the script.
 - **Keep walle light.** walle is compiled on demand by `go run` and in CI. Do not import cloud SDKs or private modules into `cmd/walle`. Commands that operate deployed infrastructure belong in a separate binary (e.g. `cmd/ops`) or a release component. `go list -deps ./cmd/walle | wc -l` is the budget to watch.
 - **One registry per concept.** Components live only in `buildscope.Components`; CLI enums and help derive from it (`${components}`). Actions are discovered from `cmd/github-actions/*`; there is no list. Child-process env lives only in `gocmd.Env` (this is where e.g. `GOEXPERIMENT` or `GOPRIVATE` goes, once, rather than in the wrapper, workflows and helpers separately).
+- **Workflow actions are pinned to full commit SHAs** with the release as a trailing comment (`uses: actions/checkout@<sha> # v7.0.1`), so a moved or compromised tag cannot change what CI or the release job runs. Dependabot (`.github/dependabot.yml`) bumps the SHA and the comment together; do not replace a pin with a tag.
 - **Checks never mutate.** `./walle check`, `fmt --check`, `tidy --check` fail with a fix command; they do not rewrite the tree.
 - **Child processes go through `internal/gocmd`** so they inherit `gocmd.Env` and the cancellation context (Ctrl-C stops the child).
 - **Paths are repo-root-relative.** The wrapper `cd`s to the repo root, and actions run in the workspace root.
