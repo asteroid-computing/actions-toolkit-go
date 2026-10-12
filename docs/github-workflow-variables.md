@@ -1,106 +1,54 @@
----
-source: https://docs.github.com/en/actions/reference/workflows-and-actions/variables
-updated: December 5 2025
----
+# Default environment variables
 
-# Variables reference
+`actioncontext` reads the default environment variables that GitHub Actions sets for every step. This table maps each one to its `ActionContext` field (and the package-level variable of the same name). GitHub's [variables reference](https://docs.github.com/en/actions/reference/workflows-and-actions/variables#default-environment-variables) is authoritative for what each variable means and when it is set.
 
-Find information for supported variables, naming conventions, limits, and contexts in GitHub Actions workflows.
+Unset variables leave strings empty and `*bool` fields nil; integer fields are 0 when unset or unparsable. Booleans parse with `strconv.ParseBool`, so `RUNNER_DEBUG=1` is true.
 
-## Default environment variables
+| Variable                     | Field                  | Type     | Notes                                                        |
+| ---------------------------- | ---------------------- | -------- | ------------------------------------------------------------ |
+| `CI`                         | `GithubCI`             | `*bool`  |                                                              |
+| `GITHUB_ACTION`              | `Action`               | `string` | Action name or step id                                       |
+| `GITHUB_ACTION_PATH`         | `ActionPath`           | `string` | Composite actions only                                       |
+| `GITHUB_ACTION_REPOSITORY`   | `ActionRepository`     | `string` | `owner/repo` of the running action                           |
+| `GITHUB_ACTIONS`             | `Actions`              | `*bool`  | True under GitHub Actions; distinguishes CI from local runs  |
+| `GITHUB_ACTOR`               | `Actor`                | `string` |                                                              |
+| `GITHUB_ACTOR_ID`            | `ActorID`              | `string` |                                                              |
+| `GITHUB_API_URL`             | `APIURL`               | `string` | Used by `NewGitHubClient` to target github.com or GHES       |
+| `GITHUB_BASE_REF`            | `BaseRef`              | `string` | `pull_request` and `pull_request_target` only                |
+| `GITHUB_ENV`                 | `EnvFilePath`          | `string` | File behind `core.SetEnv`                                    |
+| `GITHUB_EVENT_NAME`          | `EventName`            | `string` | Selects the `EventPayload` type                              |
+| `GITHUB_EVENT_PATH`          | `EventPayloadFilePath` | `string` | Decoded into `EventPayload`; raw bytes via `RawEventPayload` |
+| `GITHUB_GRAPHQL_URL`         | `GraphQLURL`           | `string` |                                                              |
+| `GITHUB_HEAD_REF`            | `HeadRef`              | `string` | `pull_request` and `pull_request_target` only                |
+| `GITHUB_JOB`                 | `JobID`                | `string` |                                                              |
+| `GITHUB_OUTPUT`              | `OutputFilePath`       | `string` | File behind `core.SetOutput`                                 |
+| `GITHUB_PATH`                | `PathFilePath`         | `string` | File behind `core.AddToPath`                                 |
+| `GITHUB_REF`                 | `Ref`                  | `string` | Fully qualified, e.g. `refs/heads/main`                      |
+| `GITHUB_REF_NAME`            | `RefName`              | `string` |                                                              |
+| `GITHUB_REF_PROTECTED`       | `RefProtected`         | `*bool`  |                                                              |
+| `GITHUB_REF_TYPE`            | `RefType`              | `string` | `branch` or `tag`                                            |
+| `GITHUB_REPOSITORY`          | `Repository`           | `string` | `owner/repo`                                                 |
+| `GITHUB_REPOSITORY_ID`       | `RepositoryID`         | `string` |                                                              |
+| `GITHUB_REPOSITORY_OWNER`    | `RepositoryOwner`      | `string` |                                                              |
+| `GITHUB_REPOSITORY_OWNER_ID` | `RepositoryOwnerID`    | `string` |                                                              |
+| `GITHUB_RETENTION_DAYS`      | `RetentionDays`        | `int`    |                                                              |
+| `GITHUB_RUN_ATTEMPT`         | `RunAttempt`           | `int`    |                                                              |
+| `GITHUB_RUN_ID`              | `RunID`                | `int`    |                                                              |
+| `GITHUB_RUN_NUMBER`          | `RunNumber`            | `int`    |                                                              |
+| `GITHUB_SERVER_URL`          | `ServerURL`            | `string` |                                                              |
+| `GITHUB_SHA`                 | `Sha`                  | `string` | Depends on the triggering event                              |
+| `GITHUB_STEP_SUMMARY`        | `StepSummaryFilePath`  | `string` | File behind `core.StepSummary`                               |
+| `GITHUB_TRIGGERING_ACTOR`    | `TriggeringActor`      | `string` | May differ from `Actor` on re-runs                           |
+| `GITHUB_WORKFLOW`            | `Workflow`             | `string` |                                                              |
+| `GITHUB_WORKFLOW_REF`        | `WorkflowRef`          | `string` |                                                              |
+| `GITHUB_WORKFLOW_SHA`        | `WorkflowSha`          | `string` |                                                              |
+| `GITHUB_WORKSPACE`           | `WorkspacePath`        | `string` |                                                              |
+| `RUNNER_ARCH`                | `RunnerArch`           | `string` |                                                              |
+| `RUNNER_DEBUG`               | `RunnerDebug`          | `*bool`  | Set only when debug logging is enabled                       |
+| `RUNNER_ENVIRONMENT`         | `RunnerEnvironment`    | `string` | `github-hosted` or `self-hosted`                             |
+| `RUNNER_NAME`                | `RunnerName`           | `string` |                                                              |
+| `RUNNER_OS`                  | `RunnerOS`             | `string` |                                                              |
+| `RUNNER_TEMP`                | `RunnerTempPath`       | `string` |                                                              |
+| `RUNNER_TOOL_CACHE`          | `RunnerToolCachePath`  | `string` |                                                              |
 
-The default environment variables that GitHub sets are available to every step in a workflow.
-
-Because default environment variables are set by GitHub and not defined in a workflow, they are not accessible through the `env` context. However, most of the default variables have a corresponding, and similarly named, context property. For example, the value of the `GITHUB_REF` variable can be read during workflow processing using the `${{ github.ref }}` context property.
-
-You can't overwrite the value of the default environment variables named `GITHUB_*` and `RUNNER_*`. Currently you can overwrite the value of the `CI` variable. However, it's not guaranteed that this will always be possible. For more information about setting environment variables, see Store information in variables and Workflow commands for GitHub Actions.
-
-We strongly recommend that actions use variables to access the filesystem rather than using hardcoded file paths. GitHub sets variables for actions to use in all runner environments.
-
-| Variable | Description           |
-| -------- | --------------------- |
-| `CI`     | Always set to `true`. |
-
-| `GITHUB_ACTION_PATH` | The path where an action is located. This property is only supported in composite actions. You can use this path to change directories to where the action is located and access other files in that same repository. For example, `/home/runner/work/_actions/repo-owner/name-of-action-repo/v1`. |
-| `GITHUB_ACTION_REPOSITORY` | For a step executing an action, this is the owner and repository name of the action. For example, `actions/checkout`. |
-| `GITHUB_ACTIONS` | Always set to `true` when GitHub Actions is running the workflow. You can use this variable to differentiate when tests are being run locally or by GitHub Actions. |
-| `GITHUB_ACTOR` | The name of the person or app that initiated the workflow. For example, `octocat`. |
-| `GITHUB_ACTOR_ID` | The account ID of the person or app that triggered the initial workflow run. For example, `1234567`. Note that this is different from the actor username. |
-| `GITHUB_API_URL` | Returns the API URL. For example: `https://api.github.com`. |
-| `GITHUB_BASE_REF` | The name of the base ref or target branch of the pull request in a workflow run. This is only set when the event that triggers a workflow run is either `pull_request` or `pull_request_target`. For example, `main`. |
-| `GITHUB_ENV` | The path on the runner to the file that sets variables from workflow commands. The path to this file is unique to the current step and changes for each step in a job. For example, `/home/runner/work/_temp/_runner_file_commands/set_env_87406d6e-4979-4d42-98e1-3dab1f48b13a`. For more information, see Workflow commands for GitHub Actions. |
-| `GITHUB_EVENT_NAME` | The name of the event that triggered the workflow. For example, `workflow_dispatch`. |
-| `GITHUB_EVENT_PATH` | The path to the file on the runner that contains the full event webhook payload. For example, `/github/workflow/event.json`. |
-| `GITHUB_GRAPHQL_URL` | Returns the GraphQL API URL. For example: `https://api.github.com/graphql`. |
-| `GITHUB_HEAD_REF` | The head ref or source branch of the pull request in a workflow run. This property is only set when the event that triggers a workflow run is either `pull_request` or `pull_request_target`. For example, `feature-branch-1`. |
-| `GITHUB_JOB` | The job_id of the current job. For example, `greeting_job`. |
-| `GITHUB_OUTPUT` | The path on the runner to the file that sets the current step's outputs from workflow commands. The path to this file is unique to the current step and changes for each step in a job. For example, `/home/runner/work/_temp/_runner_file_commands/set_output_a50ef383-b063-46d9-9157-57953fc9f3f0`. For more information, see Workflow commands for GitHub Actions. |
-| `GITHUB_PATH` | The path on the runner to the file that sets system `PATH` variables from workflow commands. The path to this file is unique to the current step and changes for each step in a job. For example, `/home/runner/work/_temp/_runner_file_commands/add_path_899b9445-ad4a-400c-aa89-249f18632cf5`. For more information, see Workflow commands for GitHub Actions. |
-
-| `GITHUB_REF_PROTECTED` | `true` if branch protections or rulesets are configured for the ref that triggered the workflow run. |
-| `GITHUB_REF_TYPE` | The type of ref that triggered the workflow run. Valid values are `branch` or `tag`. |
-| `GITHUB_REPOSITORY` | The owner and repository name. For example, `octocat/Hello-World`. |
-| `GITHUB_REPOSITORY_ID` | The ID of the repository. For example, `123456789`. Note that this is different from the repository name. |
-| `GITHUB_REPOSITORY_OWNER` | The repository owner's name. For example, `octocat`. |
-| `GITHUB_REPOSITORY_OWNER_ID` | The repository owner's account ID. For example, `1234567`. Note that this is different from the owner's name. |
-| `GITHUB_RETENTION_DAYS` | The number of days that workflow run logs and artifacts are kept. For example, `90`. |
-| `GITHUB_RUN_ATTEMPT` | A unique number for each attempt of a particular workflow run in a repository. This number begins at 1 for the workflow run's first attempt, and increments with each re-run. For example, `3`. |
-| `GITHUB_RUN_ID` | A unique number for each workflow run within a repository. This number does not change if you re-run the workflow run. For example, `1658821493`. |
-| `GITHUB_RUN_NUMBER` | A unique number for each run of a particular workflow in a repository. This number begins at 1 for the workflow's first run, and increments with each new run. This number does not change if you re-run the workflow run. For example, `3`. |
-| `GITHUB_SERVER_URL` | The URL of the GitHub server. For example: `https://github.com`. |
-| `GITHUB_SHA` | The commit SHA that triggered the workflow. The value of this commit SHA depends on the event that triggered the workflow. For more information, see Events that trigger workflows. For example, `ffac537e6cbbf934b08745a378932722df287a53`. |
-| `GITHUB_STEP_SUMMARY` | The path on the runner to the file that contains job summaries from workflow commands. The path to this file is unique to the current step and changes for each step in a job. For example, `/home/runner/_layout/_work/_temp/_runner_file_commands/step_summary_1cb22d7f-5663-41a8-9ffc-13472605c76c`. For more information, see Workflow commands for GitHub Actions. |
-| `GITHUB_TRIGGERING_ACTOR` | The username of the user that initiated the workflow run. If the workflow run is a re-run, this value may differ from `github.actor`. Any workflow re-runs will use the privileges of `github.actor`, even if the actor initiating the re-run (`github.triggering_actor`) has different privileges. |
-| `GITHUB_WORKFLOW` | The name of the workflow. For example, `My test workflow`. If the workflow file doesn't specify a `name`, the value of this variable is the full path of the workflow file in the repository. |
-| `GITHUB_WORKFLOW_REF` | The ref path to the workflow. For example, `octocat/hello-world/.github/workflows/my-workflow.yml@refs/heads/my_branch`. |
-| `GITHUB_WORKFLOW_SHA` | The commit SHA for the workflow file. |
-| `GITHUB_WORKSPACE` | The default working directory on the runner for steps, and the default location of your repository when using the `checkout` action. For example, `/home/runner/work/my-repo-name/my-repo-name`. |
-| `RUNNER_ARCH` | The architecture of the runner executing the job. Possible values are `X86`, `X64`, `ARM`, or `ARM64`. |
-| `RUNNER_DEBUG` | This is set only if debug logging is enabled, and always has the value of `1`. It can be useful as an indicator to enable additional debugging or verbose logging in your own job steps. |
-| `RUNNER_ENVIRONMENT` | The environment of the runner executing the job. Possible values are: `github-hosted` for GitHub-hosted runners provided by GitHub, and `self-hosted` for self-hosted runners configured by the repository owner. |
-| `RUNNER_NAME` | The name of the runner executing the job. This name may not be unique in a workflow run as runners at the repository and organization levels could use the same name. For example, `Hosted Agent` |
-| `RUNNER_OS` | The operating system of the runner executing the job. Possible values are `Linux`, `Windows`, or `macOS`. For example, `Windows` |
-| `RUNNER_TEMP` | The path to a temporary directory on the runner. This directory is emptied at the beginning and end of each job. Note that files will not be removed if the runner's user account does not have permission to delete them. For example, `D:\a\_temp` |
-| `RUNNER_TOOL_CACHE` | The path to the directory containing preinstalled tools for GitHub-hosted runners. For more information, see GitHub-hosted runners. For example, `C:\hostedtoolcache\windows` |
-
-Note
-
-If you need to use a workflow run's URL from within a job, you can combine these variables: `$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID`
-
-## Naming conventions for configuration variables
-
-The following rules apply to configuration variable names:
-
-- Can only contain alphanumeric characters (`[a-z]`, `[A-Z]`, `[0-9]`) or underscores (`_`). Spaces are not allowed.
-- Must not start with the `GITHUB_` prefix.
-- Must not start with a number.
-- Are case insensitive when referenced. GitHub stores secret names as uppercase regardless of how they are entered.
-- Must be unique to the repository, organization, or enterprise where they are created.
-
-## Naming conventions for environment variables
-
-When you set an environment variable, you cannot use any of the default environment variable names. For a complete list of default environment variables, see Variables reference below. If you attempt to override the value of one of these default variables, the assignment is ignored.
-
-You can list the entire set of environment variables that are available to a workflow step by using `run: env` in a step and then examining the output for the step.
-
-## Configuration variable precedence
-
-If a variable with the same name exists at multiple levels, the variable at the lowest level takes precedence. For example, if an organization-level variable has the same name as a repository-level variable, then the repository-level variable takes precedence. Similarly, if an organization, repository, and environment all have a variable with the same name, the environment-level variable takes precedence.
-
-Environment-level variables are only available on the runner after the job starts executing. This means that environment-level variables won't overwrite variables in the `env` and `vars` contexts.
-
-For reusable workflows, the variables from the caller workflow's repository are used. Variables from the repository that contains the called workflow are not made available to the caller workflow.
-
-## Limits for configuration variables
-
-Individual variables are limited to 48 KB in size.
-
-You can store up to 1,000 organization variables, 500 variables per repository, and 100 variables per environment. The total combined size limit for organization and repository variables is 256 KB per workflow run.
-
-A workflow created in a repository can access the following number of variables:
-
-- Up to 500 repository variables, if the total size of repository variables is less than 256 KB. If the total size of repository variables exceeds 256 KB, only the repository variables that fall below the limit will be available (as sorted alphabetically by variable name).
-- Up to 1,000 organization variables, if the total combined size of repository and organization variables is less than 256 KB. If the total combined size of organization and repository variables exceeds 256 KB, only the organization variables that fall below that limit will be available (after accounting for repository variables and as sorted alphabetically by variable name).
-- Up to 100 environment-level variables.
-
-Environment-level variables do not count toward the 256 KB total size limit. If you exceed the combined size limit for repository and organization variables and still need additional variables, you can use an environment and define additional variables in the environment.
+`GITHUB_STATE`, the file behind `core.SetState`, is read by `core` directly and has no `ActionContext` field.
