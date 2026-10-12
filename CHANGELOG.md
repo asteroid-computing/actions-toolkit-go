@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/asteroid-computing/actions-toolkit-go/compare/v0.1.0...v0.1.1) (2026-10-12)
+
+
+### Bug Fixes
+
+* **core:** return an error instead of panicking on incomplete lsb_release output ([d9fc995](https://github.com/asteroid-computing/actions-toolkit-go/commit/d9fc9954bb3979aea93d71ad769c944bd079c9b8))
+
 ## 0.1.0 (2026-10-12)
 
 
