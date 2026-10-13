@@ -152,6 +152,35 @@ func Error(message string, options *WorkflowCommandOptions) error {
 	return cmd.Send()
 }
 
+// IsDebug reports whether the runner has step debug logging enabled, which GitHub signals by setting RUNNER_DEBUG to 1.
+// Like the JS toolkit's isDebug, only the exact value "1" counts; actioncontext's RunnerDebug field also accepts other strconv.ParseBool true values, which GitHub does not send.
+// GitHub Reference: https://docs.github.com/en/actions/how-tos/monitor-workflows/enable-debug-logging
+func IsDebug() bool {
+	return isDebug(os.LookupEnv)
+}
+
+// isDebug is the testable implementation of [IsDebug].
+func isDebug(lookupEnv lookupEnvFunc) bool {
+	v, _ := lookupEnv("RUNNER_DEBUG")
+	return v == "1"
+}
+
+// SetFailed writes message as an error annotation and exits the process with status 1, failing the step.
+//
+// The JS toolkit's setFailed only sets the exit code and lets the action keep running; Go cannot set an exit code for later, so SetFailed exits immediately.
+// Deferred functions do not run, so write anything buffered first, in particular [StepSummary] with [Summary.Write].
+// To fail with more control, write the error with [Error] and return from main with os.Exit(1) yourself.
+// GitHub Error Command Reference: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message
+func SetFailed(message string) {
+	setFailed(os.Stdout, os.Exit, message)
+}
+
+// setFailed is the testable implementation of [SetFailed]. A failure to write the annotation does not prevent the exit.
+func setFailed(w io.Writer, exit func(int), message string) {
+	_ = NewWorkflowCommand(w, ErrorCommandStr, nil, message).Send()
+	exit(1)
+}
+
 // StartGroup begins a collapsible log group.
 // GitHub Group Command Reference: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#grouping-log-lines
 func StartGroup(name string) error {

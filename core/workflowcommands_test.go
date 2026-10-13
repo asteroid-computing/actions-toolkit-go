@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 )
 
@@ -55,3 +56,49 @@ func TestCmdPropertiesNilOptions(t *testing.T) {
 		t.Errorf("CmdProperties() on nil options = %v, want nil", got)
 	}
 }
+
+func TestIsDebug(t *testing.T) {
+	tests := []struct {
+		name string
+		env  map[string]string
+		want bool
+	}{
+		{name: "debug enabled", env: map[string]string{"RUNNER_DEBUG": "1"}, want: true},
+		{name: "unset", env: map[string]string{}, want: false},
+		{name: "true is not 1", env: map[string]string{"RUNNER_DEBUG": "true"}, want: false},
+		{name: "zero", env: map[string]string{"RUNNER_DEBUG": "0"}, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isDebug(fakeLookup(tt.env)); got != tt.want {
+				t.Errorf("isDebug() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSetFailed(t *testing.T) {
+	var buf bytes.Buffer
+	code := -1
+	setFailed(&buf, func(c int) { code = c }, "deploy failed: 50%\ndone")
+
+	if got, want := buf.String(), "::error::deploy failed: 50%25%0Adone\n"; got != want {
+		t.Errorf("setFailed wrote %q, want %q", got, want)
+	}
+	if code != 1 {
+		t.Errorf("setFailed exited with %d, want 1", code)
+	}
+}
+
+func TestSetFailedExitsWhenWriteFails(t *testing.T) {
+	code := -1
+	setFailed(failingWriter{}, func(c int) { code = c }, "boom")
+	if code != 1 {
+		t.Errorf("setFailed exited with %d after a write error, want 1", code)
+	}
+}
+
+// failingWriter is an io.Writer whose writes always fail.
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("write failed") }
