@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -88,6 +89,19 @@ func Debug(message string) error {
 	return cmd.Send()
 }
 
+// Info writes message to the log as plain text, followed by a newline, as the JS toolkit's info does.
+// The message is not escaped: a line that starts with "::" is read by the runner as a workflow command.
+func Info(message string) error {
+	return info(os.Stdout, message)
+}
+
+// info is the testable implementation of [Info].
+func info(w io.Writer, message string) error {
+	_, err := fmt.Fprintln(w, message)
+
+	return err
+}
+
 // WorkflowCommandOptions describes optional metadata for notice/warning/error commands.
 type WorkflowCommandOptions struct {
 	FileName    *string // source file path for the annotation
@@ -152,6 +166,35 @@ func Error(message string, options *WorkflowCommandOptions) error {
 	return cmd.Send()
 }
 
+// IsDebug reports whether the runner has step debug logging enabled, which GitHub signals by setting RUNNER_DEBUG to 1.
+// Like the JS toolkit's isDebug, only the exact value "1" counts; actioncontext's RunnerDebug field also accepts other strconv.ParseBool true values, which GitHub does not send.
+// GitHub Reference: https://docs.github.com/en/actions/how-tos/monitor-workflows/enable-debug-logging
+func IsDebug() bool {
+	return isDebug(os.LookupEnv)
+}
+
+// isDebug is the testable implementation of [IsDebug].
+func isDebug(lookupEnv lookupEnvFunc) bool {
+	v, _ := lookupEnv("RUNNER_DEBUG")
+	return v == "1"
+}
+
+// SetFailed writes message as an error annotation and exits the process with status 1, failing the step.
+//
+// The JS toolkit's setFailed only sets the exit code and lets the action keep running; Go cannot set an exit code for later, so SetFailed exits immediately.
+// Deferred functions do not run, so write anything buffered first, in particular [StepSummary] with [Summary.Write].
+// To fail with more control, write the error with [Error] and return from main with os.Exit(1) yourself.
+// GitHub Error Command Reference: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message
+func SetFailed(message string) {
+	setFailed(os.Stdout, os.Exit, message)
+}
+
+// setFailed is the testable implementation of [SetFailed]. A failure to write the annotation does not prevent the exit.
+func setFailed(w io.Writer, exit func(int), message string) {
+	_ = NewWorkflowCommand(w, ErrorCommandStr, nil, message).Send()
+	exit(1)
+}
+
 // StartGroup begins a collapsible log group.
 // GitHub Group Command Reference: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#grouping-log-lines
 func StartGroup(name string) error {
@@ -166,6 +209,26 @@ func EndGroup() error {
 	cmd := NewWorkflowCommand(os.Stdout, EndGroupCommandStr, nil, "")
 
 	return cmd.Send()
+}
+
+// Group runs fn inside a collapsible log group named name, and always closes the group, even when fn fails.
+// It returns fn's error joined with any error closing the group. If the group cannot be opened, fn is not run, as with the JS toolkit's group.
+// To return a value from fn, assign it to a variable fn captures.
+// GitHub Group Command Reference: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#grouping-log-lines
+func Group(name string, fn func() error) error {
+	return group(os.Stdout, name, fn)
+}
+
+// group is the testable implementation of [Group].
+func group(w io.Writer, name string, fn func() error) error {
+	if err := NewWorkflowCommand(w, StartGroupCommandStr, nil, name).Send(); err != nil {
+		return err
+	}
+
+	fnErr := fn()
+	endErr := NewWorkflowCommand(w, EndGroupCommandStr, nil, "").Send()
+
+	return errors.Join(fnErr, endErr)
 }
 
 // MaskValue instructs GitHub Actions to redact the provided value from logs.

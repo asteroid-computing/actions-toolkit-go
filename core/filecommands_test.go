@@ -306,3 +306,21 @@ func TestSetEnv(t *testing.T) {
 		})
 	}
 }
+
+func TestGetState(t *testing.T) {
+	env := map[string]string{"STATE_token": "abc", "STATE_empty": ""}
+	tests := []struct {
+		name string
+		want string
+	}{
+		{name: "token", want: "abc"},
+		{name: "empty", want: ""},
+		{name: "missing", want: ""},
+		{name: "TOKEN", want: ""},
+	}
+	for _, tt := range tests {
+		if got := getState(fakeLookup(env), tt.name); got != tt.want {
+			t.Errorf("getState(%q) = %q, want %q", tt.name, got, tt.want)
+		}
+	}
+}
