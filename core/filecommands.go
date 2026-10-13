@@ -85,16 +85,26 @@ func buildFileCommand(fs afero.Fs, lookupEnv lookupEnvFunc, uuidFunc uuidGenerat
 	}, nil
 }
 
-// SetEnv executes a GitHub Workflow command to set an environment variable in subsequent workflows steps.
+// SetEnv executes a GitHub Workflow command to set an environment variable in subsequent workflows steps,
+// and sets it in the current process so code later in this step sees it too, as the JS toolkit's exportVariable does.
+// Unlike exportVariable, the current process is changed only after the runner file is written, so a failed call changes nothing.
 // GitHub Command Reference: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-environment-variable
 func SetEnv(key, value string) error {
-	fc, err := buildFileCommand(afero.NewOsFs(), os.LookupEnv, uuid.NewV7, EnvironmentVariableFilePathEnv, key, value)
+	return setEnv(afero.NewOsFs(), os.LookupEnv, os.Setenv, uuid.NewV7, key, value)
+}
 
+// setEnv is the testable implementation of [SetEnv].
+func setEnv(fs afero.Fs, lookupEnv lookupEnvFunc, setenv setenvFunc, uuidFunc uuidGeneratorFunc, key, value string) error {
+	fc, err := buildFileCommand(fs, lookupEnv, uuidFunc, EnvironmentVariableFilePathEnv, key, value)
 	if err != nil {
 		return err
 	}
 
-	return fc.Send()
+	if err := fc.Send(); err != nil {
+		return err
+	}
+
+	return setenv(key, value)
 }
 
 // SetOutput executes a GitHub Workflow command to set a step output.
@@ -121,15 +131,17 @@ func SetState(key, value string) error {
 	return fc.Send()
 }
 
-// AddToPath executes a GitHub Workflow command to add a directory to the system PATH for subsequent workflow steps.
+// AddToPath executes a GitHub Workflow command to add a directory to the system PATH for subsequent workflow steps,
+// and prepends it to the current process's PATH so code later in this step finds its executables too, as the JS toolkit's addPath does.
+// Unlike addPath, the current process is changed only after the runner file is written, so a failed call changes nothing.
 // The runner reads GITHUB_PATH as one directory per line, so dir must not contain a line break.
 // GitHub Command Reference: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#adding-a-system-path
 func AddToPath(dir string) error {
-	return addToPath(afero.NewOsFs(), os.LookupEnv, dir)
+	return addToPath(afero.NewOsFs(), os.LookupEnv, os.Setenv, dir)
 }
 
-// addToPath is the testable implementation of [AddToPath].
-func addToPath(fs afero.Fs, lookupEnv lookupEnvFunc, dir string) error {
+// addToPath is the testable implementation of [AddToPath]. The current PATH is read through lookupEnv.
+func addToPath(fs afero.Fs, lookupEnv lookupEnvFunc, setenv setenvFunc, dir string) error {
 	if strings.ContainsAny(dir, "\r\n") {
 		return errors.New("unexpected input: path cannot contain a line break")
 	}
@@ -139,5 +151,14 @@ func addToPath(fs afero.Fs, lookupEnv lookupEnvFunc, dir string) error {
 		return errors.New("unable to find environment variable for file command")
 	}
 
-	return appendToFile(fs, filePath, dir+OsSpecificNewline)
+	if err := appendToFile(fs, filePath, dir+OsSpecificNewline); err != nil {
+		return err
+	}
+
+	path := dir
+	if current, _ := lookupEnv("PATH"); current != "" {
+		path = dir + string(os.PathListSeparator) + current
+	}
+
+	return setenv("PATH", path)
 }
