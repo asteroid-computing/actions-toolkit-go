@@ -20,3 +20,6 @@ func init() {
 type lookupEnvFunc func(string) (string, bool)
 
 type uuidGeneratorFunc func() uuid.UUID
+
+// setenvFunc sets an environment variable in the current process, like os.Setenv.
+type setenvFunc func(key, value string) error
