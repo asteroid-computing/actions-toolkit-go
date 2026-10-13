@@ -9,8 +9,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-// fakeLookup returns a LookupEnvFunc that serves the provided key→value map.
-func fakeLookup(env map[string]string) LookupEnvFunc {
+// fakeLookup returns a lookupEnvFunc that serves the provided key→value map.
+func fakeLookup(env map[string]string) lookupEnvFunc {
 	return func(key string) (string, bool) {
 		v, ok := env[key]
 		return v, ok

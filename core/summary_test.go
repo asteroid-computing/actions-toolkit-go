@@ -14,7 +14,7 @@ func TestSummaryWriteAppendAndOverwrite(t *testing.T) {
 		t.Fatalf("failed to seed summary file: %v", err)
 	}
 
-	s := NewSummary(func(key string) (string, bool) {
+	s := newSummary(func(key string) (string, bool) {
 		if key == SummaryEnvVar {
 			return path, true
 		}
@@ -44,7 +44,7 @@ func TestSummaryWriteAppendAndOverwrite(t *testing.T) {
 }
 
 func TestSummaryWriteRequiresPath(t *testing.T) {
-	s := NewSummary(func(string) (string, bool) { return "", false }, afero.NewMemMapFs())
+	s := newSummary(func(string) (string, bool) { return "", false }, afero.NewMemMapFs())
 	s.AddRaw("text", false)
 	if err := s.Write(nil); err == nil {
 		t.Fatalf("expected error when summary path missing")
@@ -56,7 +56,7 @@ func TestSummaryClearAndBufferState(t *testing.T) {
 	path := "/summary"
 	_ = afero.WriteFile(fs, path, []byte{}, 0o644)
 
-	s := NewSummary(func(key string) (string, bool) {
+	s := newSummary(func(key string) (string, bool) {
 		if key == SummaryEnvVar {
 			return path, true
 		}
@@ -96,7 +96,7 @@ func TestSummaryClearAndBufferState(t *testing.T) {
 
 func TestSummaryContentHelpers(t *testing.T) {
 	fs := afero.NewMemMapFs()
-	s := NewSummary(func(string) (string, bool) { return "/noop", true }, fs)
+	s := newSummary(func(string) (string, bool) { return "/noop", true }, fs)
 
 	s.AddRaw("raw", true)
 	s.AddEOL()

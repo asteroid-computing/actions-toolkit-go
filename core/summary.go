@@ -30,15 +30,15 @@ type Summary struct {
 }
 
 func init() {
-	StepSummary = NewSummary(os.LookupEnv, afero.NewOsFs())
+	StepSummary = newSummary(os.LookupEnv, afero.NewOsFs())
 }
 
-// NewSummary creates a [Summary] with the provided environment lookup and
+// newSummary creates a [Summary] with the provided environment lookup and
 // filesystem. If the summary file path is available, it is cached for writes.
 // Similar to the GitHub provided actions toolkit, this does not panic if the
 // summary file path is not available, but [Summary.Write] attempts will return an error.
-func NewSummary(lookupEnvFunc LookupEnvFunc, fs afero.Fs) *Summary {
-	if pathFromEnv, ok := lookupEnvFunc(SummaryEnvVar); ok {
+func newSummary(lookupEnv lookupEnvFunc, fs afero.Fs) *Summary {
+	if pathFromEnv, ok := lookupEnv(SummaryEnvVar); ok {
 		return &Summary{filePath: pathFromEnv, fs: fs}
 	}
 

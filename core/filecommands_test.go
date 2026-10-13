@@ -56,7 +56,7 @@ func TestFileCommandSendWritesToFile(t *testing.T) {
 		t.Fatalf("failed to seed file: %v", err)
 	}
 
-	fc := &FileCommand{
+	fc := &fileCommand{
 		Fs:        fs,
 		FilePath:  path,
 		Key:       "FOO",
@@ -87,8 +87,8 @@ func TestFileCommandSendTwoAppends(t *testing.T) {
 		t.Fatalf("failed to seed file: %v", err)
 	}
 
-	fc1 := &FileCommand{Fs: fs, FilePath: path, Key: "FIRST", Value: "1", Delimiter: "d1"}
-	fc2 := &FileCommand{Fs: fs, FilePath: path, Key: "SECOND", Value: "2", Delimiter: "d2"}
+	fc1 := &fileCommand{Fs: fs, FilePath: path, Key: "FIRST", Value: "1", Delimiter: "d1"}
+	fc2 := &fileCommand{Fs: fs, FilePath: path, Key: "SECOND", Value: "2", Delimiter: "d2"}
 
 	if err := fc1.Send(); err != nil {
 		t.Fatalf("fc1.Send returned error: %v", err)
@@ -113,7 +113,7 @@ func TestFileCommandSendRejectsDelimiterCollision(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	_ = afero.WriteFile(fs, "/file", nil, 0o644)
 
-	fc := &FileCommand{
+	fc := &fileCommand{
 		Fs:        fs,
 		FilePath:  "/file",
 		Key:       "bad-delim",
