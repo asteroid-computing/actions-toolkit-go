@@ -131,11 +131,12 @@ func TestSetCommandsWriteUsingEnvPaths(t *testing.T) {
 		name string
 		env  string
 		fn   func(string) error
+		want string
 	}{
-		{name: "set env", env: EnvironmentVariableFilePathEnv, fn: func(path string) error { return SetEnv("ABC", "123") }},
-		{name: "set output", env: OutputFilePathEnv, fn: func(path string) error { return SetOutput("RESULT", "ok") }},
-		{name: "set state", env: GithubStateFilePathEnv, fn: func(path string) error { return SetState("STATE", "done") }},
-		{name: "add to path", env: SystemPathFilePathEnv, fn: func(path string) error { return AddToPath("/tmp/bin") }},
+		{name: "set env", env: EnvironmentVariableFilePathEnv, fn: func(path string) error { return SetEnv("ABC", "123") }, want: "ABC<<"},
+		{name: "set output", env: OutputFilePathEnv, fn: func(path string) error { return SetOutput("RESULT", "ok") }, want: "RESULT<<"},
+		{name: "set state", env: GithubStateFilePathEnv, fn: func(path string) error { return SetState("STATE", "done") }, want: "STATE<<"},
+		{name: "add to path", env: SystemPathFilePathEnv, fn: func(path string) error { return AddToPath("/tmp/bin") }, want: "/tmp/bin" + OsSpecificNewline},
 	}
 
 	for _, tt := range tests {
@@ -156,8 +157,48 @@ func TestSetCommandsWriteUsingEnvPaths(t *testing.T) {
 				t.Fatalf("failed to read target file: %v", err)
 			}
 			content := string(data)
-			if !strings.Contains(content, "<<") {
-				t.Fatalf("expected workflow command content in file, got: %q", content)
+			if !strings.HasPrefix(content, tt.want) {
+				t.Fatalf("expected file content starting %q, got: %q", tt.want, content)
+			}
+		})
+	}
+}
+
+func TestAddToPath(t *testing.T) {
+	const pathFile = "/github_path"
+	tests := []struct {
+		name     string
+		existing string
+		dir      string
+		env      map[string]string
+		want     string
+		wantErr  bool
+	}{
+		{name: "writes one directory per line", dir: "/opt/tool/bin", env: map[string]string{SystemPathFilePathEnv: pathFile}, want: "/opt/tool/bin" + OsSpecificNewline},
+		{name: "appends to earlier entries", existing: "/first" + OsSpecificNewline, dir: "/second", env: map[string]string{SystemPathFilePathEnv: pathFile}, want: "/first" + OsSpecificNewline + "/second" + OsSpecificNewline},
+		{name: "rejects a line feed", dir: "/a\n/b", env: map[string]string{SystemPathFilePathEnv: pathFile}, wantErr: true},
+		{name: "rejects a carriage return", dir: "/a\r/b", env: map[string]string{SystemPathFilePathEnv: pathFile}, wantErr: true},
+		{name: "GITHUB_PATH unset", dir: "/opt/tool/bin", env: map[string]string{}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fs := afero.NewMemMapFs()
+			if err := afero.WriteFile(fs, pathFile, []byte(tt.existing), 0o644); err != nil {
+				t.Fatalf("failed to create path file: %v", err)
+			}
+
+			err := addToPath(fs, fakeLookup(tt.env), tt.dir)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("addToPath(%q) error = %v, wantErr %v", tt.dir, err, tt.wantErr)
+			}
+
+			data, _ := afero.ReadFile(fs, pathFile)
+			want := tt.want
+			if tt.wantErr {
+				want = tt.existing
+			}
+			if diff := cmp.Diff(want, string(data)); diff != "" {
+				t.Errorf("path file mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}

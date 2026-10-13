@@ -45,7 +45,12 @@ func (fc *fileCommand) Send() error {
 		return err
 	}
 
-	f, err := fc.Fs.OpenFile(fc.FilePath, os.O_APPEND|os.O_WRONLY, 0644)
+	return appendToFile(fc.Fs, fc.FilePath, contents.String())
+}
+
+// appendToFile appends contents to an existing runner command file.
+func appendToFile(fs afero.Fs, filePath, contents string) error {
+	f, err := fs.OpenFile(filePath, os.O_APPEND|os.O_WRONLY, 0644)
 
 	if err != nil {
 		return err
@@ -58,7 +63,7 @@ func (fc *fileCommand) Send() error {
 		}
 	}(f)
 
-	_, err = f.WriteString(contents.String())
+	_, err = f.WriteString(contents)
 
 	return err
 }
@@ -117,13 +122,22 @@ func SetState(key, value string) error {
 }
 
 // AddToPath executes a GitHub Workflow command to add a directory to the system PATH for subsequent workflow steps.
+// The runner reads GITHUB_PATH as one directory per line, so dir must not contain a line break.
 // GitHub Command Reference: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#adding-a-system-path
-func AddToPath(value string) error {
-	fc, err := buildFileCommand(afero.NewOsFs(), os.LookupEnv, uuid.NewV7, SystemPathFilePathEnv, "PATH", value)
+func AddToPath(dir string) error {
+	return addToPath(afero.NewOsFs(), os.LookupEnv, dir)
+}
 
-	if err != nil {
-		return err
+// addToPath is the testable implementation of [AddToPath].
+func addToPath(fs afero.Fs, lookupEnv lookupEnvFunc, dir string) error {
+	if strings.ContainsAny(dir, "\r\n") {
+		return errors.New("unexpected input: path cannot contain a line break")
 	}
 
-	return fc.Send()
+	filePath, ok := lookupEnv(SystemPathFilePathEnv)
+	if !ok {
+		return errors.New("unable to find environment variable for file command")
+	}
+
+	return appendToFile(fs, filePath, dir+OsSpecificNewline)
 }
