@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -86,6 +87,19 @@ func Debug(message string) error {
 	cmd := NewWorkflowCommand(os.Stdout, DebugCommandStr, nil, message)
 
 	return cmd.Send()
+}
+
+// Info writes message to the log as plain text, followed by a newline, as the JS toolkit's info does.
+// The message is not escaped: a line that starts with "::" is read by the runner as a workflow command.
+func Info(message string) error {
+	return info(os.Stdout, message)
+}
+
+// info is the testable implementation of [Info].
+func info(w io.Writer, message string) error {
+	_, err := fmt.Fprintln(w, message)
+
+	return err
 }
 
 // WorkflowCommandOptions describes optional metadata for notice/warning/error commands.
@@ -195,6 +209,26 @@ func EndGroup() error {
 	cmd := NewWorkflowCommand(os.Stdout, EndGroupCommandStr, nil, "")
 
 	return cmd.Send()
+}
+
+// Group runs fn inside a collapsible log group named name, and always closes the group, even when fn fails.
+// It returns fn's error joined with any error closing the group. If the group cannot be opened, fn is not run, as with the JS toolkit's group.
+// To return a value from fn, assign it to a variable fn captures.
+// GitHub Group Command Reference: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#grouping-log-lines
+func Group(name string, fn func() error) error {
+	return group(os.Stdout, name, fn)
+}
+
+// group is the testable implementation of [Group].
+func group(w io.Writer, name string, fn func() error) error {
+	if err := NewWorkflowCommand(w, StartGroupCommandStr, nil, name).Send(); err != nil {
+		return err
+	}
+
+	fnErr := fn()
+	endErr := NewWorkflowCommand(w, EndGroupCommandStr, nil, "").Send()
+
+	return errors.Join(fnErr, endErr)
 }
 
 // MaskValue instructs GitHub Actions to redact the provided value from logs.
