@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/google/go-github/v92/github"
 	"github.com/spf13/afero"
 )
@@ -87,9 +88,7 @@ func TestLookupToBoolPtr(t *testing.T) {
 	}
 }
 
-func TestLoadActionContextPopulatesValuesAndEventPayload(t *testing.T) {
-	defer func() { EventPayload = nil }()
-
+func TestLoadPopulatesValuesAndEventPayload(t *testing.T) {
 	fs := afero.NewMemMapFs()
 
 	const payloadPath = "/event.json"
@@ -111,94 +110,89 @@ func TestLoadActionContextPopulatesValuesAndEventPayload(t *testing.T) {
 		"RUNNER_DEBUG":             "1",
 	}
 
-	loadActionContext(fs, mockLookup(env))
-
-	if diff := cmp.Diff("build", Action); diff != "" {
-		t.Fatalf("Action mismatch (-want +got):\n%s", diff)
+	ac, err := load(fs, mockLookup(env))
+	if err != nil {
+		t.Fatalf("load returned error: %v", err)
 	}
 
-	if diff := cmp.Diff("owner/action", ActionRepository); diff != "" {
-		t.Fatalf("ActionRepository mismatch (-want +got):\n%s", diff)
+	want := &ActionContext{
+		Action:               "build",
+		ActionRepository:     "owner/action",
+		Actor:                "octocat",
+		Actions:              new(true),
+		RunID:                123,
+		RunAttempt:           2,
+		RefProtected:         new(false),
+		EventName:            "push",
+		EventPayloadFilePath: payloadPath,
+		RunnerDebug:          new(true),
+		EventPayload:         &github.PushEvent{Ref: new("refs/heads/main")},
 	}
-
-	if diff := cmp.Diff("octocat", Actor); diff != "" {
-		t.Fatalf("Actor mismatch (-want +got):\n%s", diff)
-	}
-
-	if diff := cmp.Diff(new(true), Actions); diff != "" {
-		t.Fatalf("Actions mismatch (-want +got):\n%s", diff)
-	}
-
-	if diff := cmp.Diff(123, RunID); diff != "" {
-		t.Fatalf("RunID mismatch (-want +got):\n%s", diff)
-	}
-
-	if diff := cmp.Diff(2, RunAttempt); diff != "" {
-		t.Fatalf("RunAttempt mismatch (-want +got):\n%s", diff)
-	}
-
-	if diff := cmp.Diff(new(false), RefProtected); diff != "" {
-		t.Fatalf("RefProtected mismatch (-want +got):\n%s", diff)
-	}
-
-	if diff := cmp.Diff(new(true), RunnerDebug); diff != "" {
-		t.Fatalf("RunnerDebug mismatch (-want +got):\n%s", diff)
-	}
-
-	pushPayload, ok := EventPayload.(*github.PushEvent)
-	if !ok {
-		t.Fatalf("expected PushEvent payload, got %T", EventPayload)
-	}
-
-	if got := pushPayload.GetRef(); got != "refs/heads/main" {
-		t.Fatalf("expected ref refs/heads/main, got %q", got)
+	if diff := cmp.Diff(want, ac, cmpopts.IgnoreUnexported(ActionContext{})); diff != "" {
+		t.Fatalf("load mismatch (-want +got):\n%s", diff)
 	}
 }
 
-func TestLoadActionContextInvalidPayload(t *testing.T) {
-	defer func() { EventPayload = nil }()
-
-	fs := afero.NewMemMapFs()
-
-	const payloadPath = "/event.json"
-	err := afero.WriteFile(fs, payloadPath, []byte("{not-json"), 0o644)
+func TestLoadOutsideActions(t *testing.T) {
+	ac, err := load(afero.NewMemMapFs(), mockLookup(map[string]string{}))
 	if err != nil {
+		t.Fatalf("load returned error: %v", err)
+	}
+	if diff := cmp.Diff(&ActionContext{}, ac, cmpopts.IgnoreUnexported(ActionContext{})); diff != "" {
+		t.Fatalf("expected an empty context (-want +got):\n%s", diff)
+	}
+	if ac.EventPayload != nil {
+		t.Fatalf("expected nil payload without an event file, got %T", ac.EventPayload)
+	}
+}
+
+func TestLoadPayloadErrors(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	if err := afero.WriteFile(fs, "/invalid.json", []byte("{not-json"), 0o644); err != nil {
 		t.Fatalf("failed to write payload file: %v", err)
 	}
 
-	env := map[string]string{
-		"GITHUB_EVENT_NAME": "push",
-		"GITHUB_EVENT_PATH": payloadPath,
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "invalid JSON", path: "/invalid.json"},
+		{name: "missing file", path: "/missing.json"},
 	}
-
-	loadActionContext(fs, mockLookup(env))
-
-	if EventPayload != nil {
-		t.Fatalf("expected nil payload for invalid JSON, got %T", EventPayload)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ac, err := load(fs, mockLookup(map[string]string{"GITHUB_EVENT_NAME": "push", "GITHUB_EVENT_PATH": tt.path}))
+			if err == nil {
+				t.Fatalf("expected an error, got context %v", ac)
+			}
+			if ac != nil {
+				t.Fatalf("expected nil context on error, got %v", ac)
+			}
+		})
 	}
 }
 
-func TestLoadActionContextMissingPayloadFile(t *testing.T) {
-	defer func() { EventPayload = nil }()
-
+func TestLoadUnknownEventDecodesToMap(t *testing.T) {
 	fs := afero.NewMemMapFs()
-
-	env := map[string]string{
-		"GITHUB_EVENT_NAME": "push",
-		"GITHUB_EVENT_PATH": "/missing.json",
+	if err := afero.WriteFile(fs, "/event.json", []byte(`{"answer":42}`), 0o644); err != nil {
+		t.Fatalf("failed to write payload file: %v", err)
 	}
 
-	loadActionContext(fs, mockLookup(env))
-
-	if EventPayload != nil {
-		t.Fatalf("expected nil payload for missing file, got %T", EventPayload)
+	ac, err := load(fs, mockLookup(map[string]string{"GITHUB_EVENT_NAME": "some_new_event", "GITHUB_EVENT_PATH": "/event.json"}))
+	if err != nil {
+		t.Fatalf("load returned error: %v", err)
+	}
+	m, ok := ac.EventPayload.(*map[string]any)
+	if !ok {
+		t.Fatalf("expected *map[string]any payload, got %T", ac.EventPayload)
+	}
+	if diff := cmp.Diff(map[string]any{"answer": float64(42)}, *m); diff != "" {
+		t.Fatalf("payload mismatch (-want +got):\n%s", diff)
 	}
 }
 
-// TestLoadActionContextPullRequestPayload decodes a realistic payload: nested objects, a go-github Timestamp (custom unmarshaler) and members no struct field declares, which must be ignored rather than rejected.
-func TestLoadActionContextPullRequestPayload(t *testing.T) {
-	defer func() { EventPayload = nil }()
-
+// TestLoadPullRequestPayload decodes a realistic payload: nested objects, a go-github Timestamp (custom unmarshaler) and members no struct field declares, which must be ignored rather than rejected.
+func TestLoadPullRequestPayload(t *testing.T) {
 	fs := afero.NewMemMapFs()
 
 	const payloadPath = "/event.json"
@@ -212,13 +206,14 @@ func TestLoadActionContextPullRequestPayload(t *testing.T) {
 		"GITHUB_EVENT_PATH": payloadPath,
 	}
 
-	if err := loadActionContext(fs, mockLookup(env)); err != nil {
-		t.Fatalf("loadActionContext returned error: %v", err)
+	ac, err := load(fs, mockLookup(env))
+	if err != nil {
+		t.Fatalf("load returned error: %v", err)
 	}
 
-	pr, ok := CurrentActionContext.PullRequestEvent()
+	pr, ok := ac.PullRequestEvent()
 	if !ok {
-		t.Fatalf("expected PullRequestEvent payload, got %T", EventPayload)
+		t.Fatalf("expected PullRequestEvent payload, got %T", ac.EventPayload)
 	}
 	got := []string{pr.GetAction(), pr.GetPullRequest().GetHead().GetSHA(), pr.GetPullRequest().GetBase().GetRef(), pr.GetRepo().GetFullName(), pr.GetPullRequest().GetCreatedAt().UTC().Format("2006-01-02T15:04:05Z")}
 	want := []string{"opened", "abc1234def", "main", "owner/repo", "2026-10-12T09:30:00Z"}
@@ -231,8 +226,6 @@ func TestLoadActionContextPullRequestPayload(t *testing.T) {
 }
 
 func TestRawEventPayload(t *testing.T) {
-	defer func() { EventPayload = nil }()
-
 	fs := afero.NewMemMapFs()
 
 	const payloadPath = "/event.json"
@@ -247,19 +240,23 @@ func TestRawEventPayload(t *testing.T) {
 		"GITHUB_EVENT_PATH": payloadPath,
 	}
 
-	loadActionContext(fs, mockLookup(env))
+	ac, err := load(fs, mockLookup(env))
+	if err != nil {
+		t.Fatalf("load returned error: %v", err)
+	}
 
-	if got := string(CurrentActionContext.RawEventPayload()); got != raw {
+	if got := string(ac.RawEventPayload()); got != raw {
 		t.Errorf("RawEventPayload() = %q, want %q", got, raw)
 	}
 }
 
 func TestRawEventPayloadNoEventFile(t *testing.T) {
-	defer func() { EventPayload = nil }()
+	ac, err := load(afero.NewMemMapFs(), mockLookup(map[string]string{}))
+	if err != nil {
+		t.Fatalf("load returned error: %v", err)
+	}
 
-	loadActionContext(afero.NewMemMapFs(), mockLookup(map[string]string{}))
-
-	if got := CurrentActionContext.RawEventPayload(); got != nil {
+	if got := ac.RawEventPayload(); got != nil {
 		t.Errorf("RawEventPayload() = %q, want nil", got)
 	}
 }

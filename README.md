@@ -13,7 +13,7 @@ The API is not yet stable: while the version is below 1.0.0, a minor release may
 ## Packages
 
 - **`core`** — inputs (`GetInput`, `GetBooleanInput`, `GetMultilineInput`), outputs and file commands (`SetOutput`, `SetEnv`, `SetState`, `AddToPath`), workflow commands (`Debug`, `Notice`, `Warning`, `Error`, `StartGroup`/`EndGroup`, `MaskValue`, `StopCommands`) and the job summary builder (`StepSummary`).
-- **`actioncontext`** — the run's context, populated at import from the [default environment variables](docs/github-workflow-variables.md), with the event payload decoded into the matching [go-github](https://github.com/google/go-github) type (`PullRequestEvent()`, `PushEvent()`, …), the raw payload (`RawEventPayload()`), and `NewGitHubClient` targeting the run's API host (github.com or GHES).
+- **`actioncontext`** — the run's context, read by `actioncontext.Load()` from the [default environment variables](docs/github-workflow-variables.md), with the event payload decoded into the matching [go-github](https://github.com/google/go-github) type (`PullRequestEvent()`, `PushEvent()`, …), the raw payload (`RawEventPayload()`), and `NewGitHubClient` targeting the run's API host (github.com or GHES).
 
 ```go
 package main
@@ -32,7 +32,12 @@ func main() {
 		core.Error(err.Error(), nil)
 		os.Exit(1)
 	}
-	if pr, ok := actioncontext.CurrentActionContext.PullRequestEvent(); ok {
+	ac, err := actioncontext.Load()
+	if err != nil {
+		core.Error(err.Error(), nil)
+		os.Exit(1)
+	}
+	if pr, ok := ac.PullRequestEvent(); ok {
 		fmt.Printf("PR #%d\n", pr.GetNumber())
 	}
 	core.SetOutput("greeting", "Hello, "+name)

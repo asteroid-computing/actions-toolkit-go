@@ -1,12 +1,8 @@
-// Package actioncontext provides the GitHub Actions runtime context,
-// auto-populated from environment variables at package import time.
+// Package actioncontext provides the GitHub Actions runtime context of the current step.
 //
-// The init function populates the package-level variables (such as [Actor], [Repository], and [EventName])
-// and [CurrentActionContext] by reading the standard GitHub Actions default environment variables.
+// Call [Load] to read it: it reads the default environment variables GitHub Actions sets for every step into an [ActionContext], and decodes the event payload named by GITHUB_EVENT_NAME and GITHUB_EVENT_PATH into [ActionContext.EventPayload], available through typed accessors such as [ActionContext.PullRequestEvent]. Importing the package has no side effects.
 //
-// The typed event payload in [ActionContext.EventPayload] and the per-type accessor methods
-// (such as [ActionContext.PullRequestEvent]) are populated from the event file
-// identified by GITHUB_EVENT_NAME and GITHUB_EVENT_PATH.
+// Variable reference: https://docs.github.com/en/actions/reference/workflows-and-actions/variables#default-environment-variables
 package actioncontext
 
 import (
@@ -19,59 +15,102 @@ import (
 
 	"github.com/google/go-github/v92/github"
 	"github.com/spf13/afero"
-
-	"github.com/asteroid-computing/actions-toolkit-go/core"
 )
 
-// ActionContext represents the complete GitHub Actions runtime context
-// with all environment variables and event payload.
-// Use [CurrentActionContext] for the auto-populated instance.
+// ActionContext is the GitHub Actions runtime context of the current step: the default environment variables and the decoded event payload. Use [Load] to populate one.
+//
+// A string field is empty and a *bool field nil when its variable is unset; an int field is 0 when its variable is unset or not an integer.
 type ActionContext struct {
-	GithubCI             *bool  `json:"githubCI,omitzero"`
-	Action               string `json:"action,omitzero"`
-	ActionPath           string `json:"actionPath,omitzero"`
-	ActionRepository     string `json:"actionRepository,omitzero"`
-	Actions              *bool  `json:"actions,omitzero"`
-	Actor                string `json:"actor,omitzero"`
-	ActorID              string `json:"actorId,omitzero"`
-	APIURL               string `json:"apiUrl,omitzero"`
-	BaseRef              string `json:"baseRef,omitzero"`
-	EnvFilePath          string `json:"envFilePath,omitzero"`
-	EventName            string `json:"eventName,omitzero"`
+	// GithubCI is always true on GitHub Actions. Environment variable: CI.
+	GithubCI *bool `json:"githubCI,omitzero"`
+	// Action is the name of the running action, or the id of a step. Environment variable: GITHUB_ACTION.
+	Action string `json:"action,omitzero"`
+	// ActionPath is the directory of the running action. Set only in composite actions. Environment variable: GITHUB_ACTION_PATH.
+	ActionPath string `json:"actionPath,omitzero"`
+	// ActionRepository is the owner and repository name of the running action. Environment variable: GITHUB_ACTION_REPOSITORY.
+	ActionRepository string `json:"actionRepository,omitzero"`
+	// Actions is true when GitHub Actions is running the workflow, which distinguishes a CI run from a local one. Environment variable: GITHUB_ACTIONS.
+	Actions *bool `json:"actions,omitzero"`
+	// Actor is the name of the person or app that initiated the workflow. Environment variable: GITHUB_ACTOR.
+	Actor string `json:"actor,omitzero"`
+	// ActorID is the account ID of the person or app that triggered the initial workflow run. Environment variable: GITHUB_ACTOR_ID.
+	ActorID string `json:"actorId,omitzero"`
+	// APIURL is the GitHub REST API base URL; [ActionContext.NewGitHubClient] targets it. Environment variable: GITHUB_API_URL.
+	APIURL string `json:"apiUrl,omitzero"`
+	// BaseRef is the target branch of the pull request. Set only for pull_request and pull_request_target. Environment variable: GITHUB_BASE_REF.
+	BaseRef string `json:"baseRef,omitzero"`
+	// EnvFilePath is the step's file for setting environment variables (see core.SetEnv). Environment variable: GITHUB_ENV.
+	EnvFilePath string `json:"envFilePath,omitzero"`
+	// EventName is the name of the event that triggered the workflow; it selects the type of [ActionContext.EventPayload]. Environment variable: GITHUB_EVENT_NAME.
+	EventName string `json:"eventName,omitzero"`
+	// EventPayloadFilePath is the file holding the event's full webhook payload. Environment variable: GITHUB_EVENT_PATH.
 	EventPayloadFilePath string `json:"eventPayloadFilePath,omitzero"`
-	GraphQLURL           string `json:"graphqlUrl,omitzero"`
-	HeadRef              string `json:"headRef,omitzero"`
-	JobID                string `json:"jobId,omitzero"`
-	OutputFilePath       string `json:"outputFilePath,omitzero"`
-	PathFilePath         string `json:"pathFilePath,omitzero"`
-	Ref                  string `json:"ref,omitzero"`
-	RefName              string `json:"refName,omitzero"`
-	RefProtected         *bool  `json:"refProtected,omitzero"`
-	RefType              string `json:"refType,omitzero"`
-	Repository           string `json:"repository,omitzero"`
-	RepositoryID         string `json:"repositoryId,omitzero"`
-	RepositoryOwner      string `json:"repositoryOwner,omitzero"`
-	RepositoryOwnerID    string `json:"repositoryOwnerId,omitzero"`
-	RetentionDays        int    `json:"retentionDays,omitzero"`
-	RunAttempt           int    `json:"runAttempt,omitzero"`
-	RunID                int    `json:"runId,omitzero"`
-	RunNumber            int    `json:"runNumber,omitzero"`
-	ServerURL            string `json:"serverUrl,omitzero"`
-	Sha                  string `json:"sha,omitzero"`
-	StepSummaryFilePath  string `json:"stepSummaryFilePath,omitzero"`
-	TriggeringActor      string `json:"triggeringActor,omitzero"`
-	Workflow             string `json:"workflow,omitzero"`
-	WorkflowRef          string `json:"workflowRef,omitzero"`
-	WorkflowSha          string `json:"workflowSha,omitzero"`
-	WorkspacePath        string `json:"workspacePath,omitzero"`
-	RunnerArch           string `json:"runnerArch,omitzero"`
-	RunnerDebug          *bool  `json:"runnerDebug,omitzero"`
-	RunnerEnvironment    string `json:"runnerEnvironment,omitzero"`
-	RunnerName           string `json:"runnerName,omitzero"`
-	RunnerOS             string `json:"runnerOs,omitzero"`
-	RunnerTempPath       string `json:"runnerTempPath,omitzero"`
-	RunnerToolCachePath  string `json:"runnerToolCachePath,omitzero"`
-	EventPayload         any    `json:"eventPayload,omitzero"`
+	// GraphQLURL is the GitHub GraphQL API URL. Environment variable: GITHUB_GRAPHQL_URL.
+	GraphQLURL string `json:"graphqlUrl,omitzero"`
+	// HeadRef is the source branch of the pull request. Set only for pull_request and pull_request_target. Environment variable: GITHUB_HEAD_REF.
+	HeadRef string `json:"headRef,omitzero"`
+	// JobID is the job_id of the current job. Environment variable: GITHUB_JOB.
+	JobID string `json:"jobId,omitzero"`
+	// OutputFilePath is the step's file for setting outputs (see core.SetOutput). Environment variable: GITHUB_OUTPUT.
+	OutputFilePath string `json:"outputFilePath,omitzero"`
+	// PathFilePath is the step's file for adding to PATH (see core.AddToPath). Environment variable: GITHUB_PATH.
+	PathFilePath string `json:"pathFilePath,omitzero"`
+	// Ref is the fully formed ref that triggered the run, e.g. refs/heads/main, refs/tags/v1.0.0 or refs/pull/45/merge. Environment variable: GITHUB_REF.
+	Ref string `json:"ref,omitzero"`
+	// RefName is the short name of the branch or tag that triggered the run. Environment variable: GITHUB_REF_NAME.
+	RefName string `json:"refName,omitzero"`
+	// RefProtected is true if branch protections or rulesets apply to the ref that triggered the run. Environment variable: GITHUB_REF_PROTECTED.
+	RefProtected *bool `json:"refProtected,omitzero"`
+	// RefType is the type of ref that triggered the run: branch or tag. Environment variable: GITHUB_REF_TYPE.
+	RefType string `json:"refType,omitzero"`
+	// Repository is the owner and repository name, e.g. octocat/Hello-World. Environment variable: GITHUB_REPOSITORY.
+	Repository string `json:"repository,omitzero"`
+	// RepositoryID is the ID of the repository. Environment variable: GITHUB_REPOSITORY_ID.
+	RepositoryID string `json:"repositoryId,omitzero"`
+	// RepositoryOwner is the repository owner's name. Environment variable: GITHUB_REPOSITORY_OWNER.
+	RepositoryOwner string `json:"repositoryOwner,omitzero"`
+	// RepositoryOwnerID is the repository owner's account ID. Environment variable: GITHUB_REPOSITORY_OWNER_ID.
+	RepositoryOwnerID string `json:"repositoryOwnerId,omitzero"`
+	// RetentionDays is how many days workflow run logs and artifacts are kept. Environment variable: GITHUB_RETENTION_DAYS.
+	RetentionDays int `json:"retentionDays,omitzero"`
+	// RunAttempt is the attempt number of this workflow run, starting at 1 and incremented on each re-run. Environment variable: GITHUB_RUN_ATTEMPT.
+	RunAttempt int `json:"runAttempt,omitzero"`
+	// RunID is the unique number of this workflow run within the repository; it does not change on re-runs. Environment variable: GITHUB_RUN_ID.
+	RunID int `json:"runId,omitzero"`
+	// RunNumber is the run's number within its workflow, starting at 1; it does not change on re-runs. Environment variable: GITHUB_RUN_NUMBER.
+	RunNumber int `json:"runNumber,omitzero"`
+	// ServerURL is the URL of the GitHub server, e.g. https://github.com. Environment variable: GITHUB_SERVER_URL.
+	ServerURL string `json:"serverUrl,omitzero"`
+	// Sha is the commit SHA that triggered the workflow; which commit depends on the event. Environment variable: GITHUB_SHA.
+	Sha string `json:"sha,omitzero"`
+	// StepSummaryFilePath is the step's job summary file (see core.StepSummary). Environment variable: GITHUB_STEP_SUMMARY.
+	StepSummaryFilePath string `json:"stepSummaryFilePath,omitzero"`
+	// TriggeringActor is the user that initiated the run; on a re-run it may differ from [ActionContext.Actor], whose privileges the run uses. Environment variable: GITHUB_TRIGGERING_ACTOR.
+	TriggeringActor string `json:"triggeringActor,omitzero"`
+	// Workflow is the name of the workflow. Environment variable: GITHUB_WORKFLOW.
+	Workflow string `json:"workflow,omitzero"`
+	// WorkflowRef is the ref path to the workflow file. Environment variable: GITHUB_WORKFLOW_REF.
+	WorkflowRef string `json:"workflowRef,omitzero"`
+	// WorkflowSha is the commit SHA of the workflow file. Environment variable: GITHUB_WORKFLOW_SHA.
+	WorkflowSha string `json:"workflowSha,omitzero"`
+	// WorkspacePath is the default working directory for steps and where actions/checkout puts the repository. Environment variable: GITHUB_WORKSPACE.
+	WorkspacePath string `json:"workspacePath,omitzero"`
+	// RunnerArch is the runner's architecture: X86, X64, ARM or ARM64. Environment variable: RUNNER_ARCH.
+	RunnerArch string `json:"runnerArch,omitzero"`
+	// RunnerDebug is true when debug logging is enabled; the variable is unset otherwise. Environment variable: RUNNER_DEBUG.
+	RunnerDebug *bool `json:"runnerDebug,omitzero"`
+	// RunnerEnvironment is github-hosted or self-hosted. Environment variable: RUNNER_ENVIRONMENT.
+	RunnerEnvironment string `json:"runnerEnvironment,omitzero"`
+	// RunnerName is the name of the runner executing the job; it may not be unique. Environment variable: RUNNER_NAME.
+	RunnerName string `json:"runnerName,omitzero"`
+	// RunnerOS is the runner's operating system: Linux, Windows or macOS. Environment variable: RUNNER_OS.
+	RunnerOS string `json:"runnerOs,omitzero"`
+	// RunnerTempPath is a temporary directory emptied at the start and end of each job. Environment variable: RUNNER_TEMP.
+	RunnerTempPath string `json:"runnerTempPath,omitzero"`
+	// RunnerToolCachePath is the directory of preinstalled tools on GitHub-hosted runners. Environment variable: RUNNER_TOOL_CACHE.
+	RunnerToolCachePath string `json:"runnerToolCachePath,omitzero"`
+	// EventPayload is the decoded event payload: a pointer to the github.com/google/go-github/v92/github event type matching [ActionContext.EventName], a *map[string]any for an event without a matching type, or nil when there is no event file. Prefer the typed accessors, such as [ActionContext.PullRequestEvent].
+	EventPayload any `json:"eventPayload,omitzero"`
 
 	// rawEventPayload holds the unmodified JSON bytes read from the event file.
 	// Stored separately from EventPayload so callers on a different go-github major can unmarshal it themselves.
@@ -176,438 +215,153 @@ func (ac *ActionContext) RawEventPayload() stdjson.RawMessage {
 	return ac.rawEventPayload
 }
 
-// The following exported variables are auto-populated at package import time from
-// the GitHub Actions default environment variables.
-// Each mirrors the same field on [CurrentActionContext].
-// Details for each variable:
-// https://docs.github.com/en/actions/reference/workflows-and-actions/variables#default-environment-variables
-var (
-	// CurrentActionContext holds the populated [ActionContext] from GitHub Actions environment variables.
-	CurrentActionContext *ActionContext
-
-	// GithubCI indicates whether the runner is executing under GitHub Actions (CI).
-	// During a GitHub Actions workflow run, this is always true.
-	// Environment Variable: CI
-	GithubCI *bool
-
-	// Action is the name of the action currently running, or the id of a step. For example, for an action, __repo-owner_name-of-action-repo.
-	// Environment Variable: GITHUB_ACTION
-	Action string
-
-	// ActionPath is the path where an action is located. This property is only supported in composite actions.
-	// Environment Variable: GITHUB_ACTION_PATH
-	ActionPath string
-
-	// ActionRepository is, for a step executing an action, the owner and repository name of the action.
-	// Environment Variable: GITHUB_ACTION_REPOSITORY
-	ActionRepository string
-
-	// Actions is always set to true when GitHub Actions is running the workflow.
-	// You can use this variable to differentiate when tests are being run locally or by GitHub Actions.
-	// Environment Variable: GITHUB_ACTIONS
-	Actions *bool
-
-	// Actor is the name of the person or app that initiated the workflow.
-	// Environment Variable: GITHUB_ACTOR
-	Actor string
-
-	// ActorID is the account ID of the person or app that triggered the initial workflow run.
-	// Environment Variable: GITHUB_ACTOR_ID
-	ActorID string
-
-	// APIURL is the GitHub REST API base URL
-	// Environment Variable: GITHUB_API_URL
-	APIURL string
-
-	// BaseRef is the name of the base ref or target branch of the pull request in a workflow run.
-	// This is only set when the event that triggers a workflow run is either pull_request or pull_request_target.
-	// Environment Variable: GITHUB_BASE_REF
-	BaseRef string
-
-	// EnvFilePath is the path on the runner to the file that sets variables from workflow commands.
-	// The path to this file is unique to the current step and changes for each step in a job.
-	// Environment Variable: GITHUB_ENV
-	EnvFilePath string
-
-	// EventName is the name of the event that triggered the workflow.
-	// Environment Variable: GITHUB_EVENT_NAME
-	EventName string
-
-	// EventPayloadFilePath is the path to the file on the runner that contains the full event webhook payload.
-	// Environment Variable: GITHUB_EVENT_PATH
-	EventPayloadFilePath string
-
-	// GraphQLURL is the GitHub GraphQL API base URL.
-	// Environment Variable: GITHUB_GRAPHQL_URL
-	GraphQLURL string
-
-	// HeadRef is the head ref or source branch of the pull request in a workflow run.
-	// This property is only set when the event that triggers a workflow run is either pull_request or pull_request_target.
-	// Environment Variable: GITHUB_HEAD_REF
-	HeadRef string
-
-	// JobID is the Job ID of the current job.
-	// Environment Variable: GITHUB_JOB
-	JobID string
-
-	// OutputFilePath is the path on the runner to the file that sets the current step's outputs from workflow commands.
-	// The path to this file is unique to the current step and changes for each step in a job.
-	// Environment Variable: GITHUB_OUTPUT
-	OutputFilePath string
-
-	// PathFilePath is the path on the runner to the file that sets system PATH variables from workflow commands.
-	// The path to this file is unique to the current step and changes for each step in a job.
-	// Environment Variable: GITHUB_PATH
-	PathFilePath string
-
-	// Ref is the fully-formed ref of the branch or tag that triggered the workflow run.
-	// For workflows triggered by push, this is the branch or tag ref that was pushed.
-	// For workflows triggered by pull_request, this is the pull request merge branch.
-	// For workflows triggered by release, this is the release tag created.
-	// For other triggers, this is the branch or tag ref that triggered the workflow run.
-	// This is only set if a branch or tag is available for the event type.
-	// The ref given is fully-formed, meaning that for branches the format is refs/heads/<branch_name>.
-	// For pull requests events except pull_request_target, it is refs/pull/<pr_number>/merge
-	// pull_request_target events have the ref from the base branch. For tags it is refs/tags/<tag_name>.
-	// Environment Variable: GITHUB_REF
-	Ref string
-
-	// RefName is the short ref name of the branch or tag that triggered the workflow run.
-	// This value matches the branch or tag name shown on GitHub.
-	// Environment Variable: GITHUB_REF_NAME
-	RefName string
-
-	// RefProtected is true if branch protections or rulesets are configured for the ref that triggered the workflow run.
-	// Environment Variable: GITHUB_REF_PROTECTED
-	RefProtected *bool
-
-	// RefType is the type of ref that triggered the workflow run. Valid values are branch or tag.
-	// Environment Variable: GITHUB_REF_TYPE
-	RefType string
-
-	// Repository is the owner and repository name.
-	// Environment Variable: GITHUB_REPOSITORY
-	Repository string
-
-	// RepositoryID is the ID of the repository.
-	// Environment Variable: GITHUB_REPOSITORY_ID
-	RepositoryID string
-
-	// RepositoryOwner is the repository owner's name.
-	// Environment Variable: GITHUB_REPOSITORY_OWNER
-	RepositoryOwner string
-
-	// RepositoryOwnerID is the repository owner's account ID.
-	// Environment Variable: GITHUB_REPOSITORY_OWNER_ID
-	RepositoryOwnerID string
-
-	// RetentionDays is the number of days that workflow run logs and artifacts are kept.
-	// Environment Variable: GITHUB_RETENTION_DAYS
-	RetentionDays int
-
-	// RunAttempt is a unique number for each attempt of a particular workflow run in a repository.
-	// This number begins at 1 for the workflow run's first attempt, and increments with each re-run.
-	// Environment Variable: GITHUB_RUN_ATTEMPT
-	RunAttempt int
-
-	// RunID is a unique number for each workflow run within a repository.
-	// This number does not change if you re-run the workflow run.
-	// Environment Variable: GITHUB_RUN_ID
-	RunID int
-
-	// RunNumber is a unique number for each run of a particular workflow in a repository.
-	// This number begins at 1 for the workflow's first run, and increments with each new run.
-	// This number does not change if you re-run the workflow run.
-	// Environment Variable: GITHUB_RUN_NUMBER
-	RunNumber int
-
-	// ServerURL is the URL of the GitHub server.
-	// Environment Variable: GITHUB_SERVER_URL
-	ServerURL string
-
-	// Sha is the commit SHA that triggered the workflow.
-	// The value of this commit SHA depends on the event that triggered the workflow.
-	// Environment Variable: GITHUB_SHA
-	Sha string
-
-	// StepSummaryFilePath is the path on the runner to the file that contains job summaries from workflow commands.
-	// The path to this file is unique to the current step and changes for each step in a job.
-	// Environment Variable: GITHUB_STEP_SUMMARY
-	StepSummaryFilePath string
-
-	// TriggeringActor is the username of the user that initiated the workflow run.
-	// If the workflow run is a re-run, this value may differ from github.actor.
-	// Any workflow re-runs will use the privileges of github.actor,
-	// even if the actor initiating the re-run (github.triggering_actor) has different privileges.
-	// Environment Variable: GITHUB_TRIGGERING_ACTOR
-	TriggeringActor string
-
-	// Workflow is the name of the workflow.
-	// Environment Variable: GITHUB_WORKFLOW
-	Workflow string
-
-	// WorkflowRef is the ref path to the workflow.
-	// Environment Variable: GITHUB_WORKFLOW_REF
-	WorkflowRef string
-
-	// WorkflowSha is the commit SHA for the workflow file.
-	// Environment Variable: GITHUB_WORKFLOW_SHA
-	WorkflowSha string
-
-	// WorkspacePath is the default working directory on the runner for steps,
-	// and the default location of your repository when using the checkout action.
-	// Environment Variable: GITHUB_WORKSPACE
-	WorkspacePath string
-
-	// RunnerArch is the architecture of the runner executing the job. Possible values are X86, X64, ARM, or ARM64.
-	// Environment Variable: RUNNER_ARCH
-	RunnerArch string
-
-	// RunnerDebug is this is set only if debug logging is enabled, and always has the value of 1.
-	// It can be useful as an indicator to enable additional debugging or verbose logging in your own job steps.
-	// Environment Variable: RUNNER_DEBUG
-	RunnerDebug *bool
-
-	// RunnerEnvironment is the environment of the runner executing the job.
-	// Possible values are: github-hosted for GitHub-hosted runners provided by GitHub,
-	// and self-hosted for self-hosted runners configured by the repository owner.
-	// Environment Variable: RUNNER_ENVIRONMENT
-	RunnerEnvironment string
-
-	// RunnerName is the name of the runner executing the job.
-	// This name may not be unique in a workflow run as runners at the repository
-	// and organization levels could use the same name.
-	// Environment Variable: RUNNER_NAME
-	RunnerName string
-
-	// RunnerOS is the operating system of the runner executing the job.
-	// Possible values are Linux, Windows, or macOS.
-	// Environment Variable: RUNNER_OS
-	RunnerOS string
-
-	// RunnerTempPath is the path to a temporary directory on the runner.
-	// This directory is emptied at the beginning and end of each job.
-	// Note that files will not be removed if the runner's user account does not have permission to delete them.
-	// Environment Variable: RUNNER_TEMP
-	RunnerTempPath string
-
-	// RunnerToolCachePath is the path to the directory containing preinstalled tools for GitHub-hosted runners.
-	// Environment Variable: RUNNER_TOOL_CACHE
-	RunnerToolCachePath string
-
-	// EventPayload is the typed event payload object parsed from the event file.
-	// The concrete type depends on [EventName] and is one of the
-	// [github.com/google/go-github/v92/github] event types.
-	EventPayload any
-)
-
-func init() {
-	err := loadActionContext(afero.NewOsFs(), os.LookupEnv)
-	if err != nil {
-		core.Debug("Error loading action context: " + err.Error())
-	}
-
-	if CurrentActionContext != nil {
-		core.Debug(CurrentActionContext.String())
-	}
+// Load reads the current step's context from the process environment and, when GITHUB_EVENT_NAME and GITHUB_EVENT_PATH are set, decodes the event payload file.
+//
+// Load reads the environment and the file on every call; call it once and pass the result around. Outside GitHub Actions it returns a context with every field unset, not an error. It returns an error if the event file cannot be read or decoded.
+func Load() (*ActionContext, error) {
+	return load(afero.NewOsFs(), os.LookupEnv)
 }
 
 type lookupEnvFunc func(key string) (string, bool)
 
-// loadActionContext loads action context from environment variables and is provided for testing purposes.
-// The provided lookupEnv function is used to retrieve environment variable values.
-// The provided afero.Fs is used to read the event payload file.
-// Returns an error if loading the event payload fails.
-func loadActionContext(fs afero.Fs, lookupEnv lookupEnvFunc) error {
-	EventPayload = nil
-
-	Action = lookupToStr(lookupEnv("GITHUB_ACTION"))
-	ActionPath = lookupToStr(lookupEnv("GITHUB_ACTION_PATH"))
-	ActionRepository = lookupToStr(lookupEnv("GITHUB_ACTION_REPOSITORY"))
-	Actions = lookupToBoolPtr(lookupEnv("GITHUB_ACTIONS"))
-	Actor = lookupToStr(lookupEnv("GITHUB_ACTOR"))
-	ActorID = lookupToStr(lookupEnv("GITHUB_ACTOR_ID"))
-	APIURL = lookupToStr(lookupEnv("GITHUB_API_URL"))
-	BaseRef = lookupToStr(lookupEnv("GITHUB_BASE_REF"))
-	EnvFilePath = lookupToStr(lookupEnv("GITHUB_ENV"))
-	EventName = lookupToStr(lookupEnv("GITHUB_EVENT_NAME"))
-	EventPayloadFilePath = lookupToStr(lookupEnv("GITHUB_EVENT_PATH"))
-	GithubCI = lookupToBoolPtr(lookupEnv("CI"))
-	GraphQLURL = lookupToStr(lookupEnv("GITHUB_GRAPHQL_URL"))
-	HeadRef = lookupToStr(lookupEnv("GITHUB_HEAD_REF"))
-	JobID = lookupToStr(lookupEnv("GITHUB_JOB"))
-	OutputFilePath = lookupToStr(lookupEnv("GITHUB_OUTPUT"))
-	PathFilePath = lookupToStr(lookupEnv("GITHUB_PATH"))
-	Ref = lookupToStr(lookupEnv("GITHUB_REF"))
-	RefName = lookupToStr(lookupEnv("GITHUB_REF_NAME"))
-	RefProtected = lookupToBoolPtr(lookupEnv("GITHUB_REF_PROTECTED"))
-	RefType = lookupToStr(lookupEnv("GITHUB_REF_TYPE"))
-	Repository = lookupToStr(lookupEnv("GITHUB_REPOSITORY"))
-	RepositoryID = lookupToStr(lookupEnv("GITHUB_REPOSITORY_ID"))
-	RepositoryOwner = lookupToStr(lookupEnv("GITHUB_REPOSITORY_OWNER"))
-	RepositoryOwnerID = lookupToStr(lookupEnv("GITHUB_REPOSITORY_OWNER_ID"))
-	RetentionDays = lookupToInt(lookupEnv("GITHUB_RETENTION_DAYS"))
-	RunAttempt = lookupToInt(lookupEnv("GITHUB_RUN_ATTEMPT"))
-	RunID = lookupToInt(lookupEnv("GITHUB_RUN_ID"))
-	RunNumber = lookupToInt(lookupEnv("GITHUB_RUN_NUMBER"))
-	ServerURL = lookupToStr(lookupEnv("GITHUB_SERVER_URL"))
-	Sha = lookupToStr(lookupEnv("GITHUB_SHA"))
-	StepSummaryFilePath = lookupToStr(lookupEnv("GITHUB_STEP_SUMMARY"))
-	TriggeringActor = lookupToStr(lookupEnv("GITHUB_TRIGGERING_ACTOR"))
-	Workflow = lookupToStr(lookupEnv("GITHUB_WORKFLOW"))
-	WorkflowRef = lookupToStr(lookupEnv("GITHUB_WORKFLOW_REF"))
-	WorkflowSha = lookupToStr(lookupEnv("GITHUB_WORKFLOW_SHA"))
-	WorkspacePath = lookupToStr(lookupEnv("GITHUB_WORKSPACE"))
-
-	RunnerArch = lookupToStr(lookupEnv("RUNNER_ARCH"))
-	RunnerDebug = lookupToBoolPtr(lookupEnv("RUNNER_DEBUG"))
-	RunnerEnvironment = lookupToStr(lookupEnv("RUNNER_ENVIRONMENT"))
-	RunnerName = lookupToStr(lookupEnv("RUNNER_NAME"))
-	RunnerOS = lookupToStr(lookupEnv("RUNNER_OS"))
-	RunnerTempPath = lookupToStr(lookupEnv("RUNNER_TEMP"))
-	RunnerToolCachePath = lookupToStr(lookupEnv("RUNNER_TOOL_CACHE"))
-
-	var rawPayload stdjson.RawMessage
-
-	if EventName != "" && EventPayloadFilePath != "" {
-		payloadBytes, err := afero.ReadFile(fs, EventPayloadFilePath)
-
-		if err != nil {
-			EventPayload = nil
-			return fmt.Errorf("failed to read event payload file: %w", err)
-		}
-
-		rawPayload = stdjson.RawMessage(payloadBytes)
-
-		switch EventName {
-		case "branch_protection_rule":
-			EventPayload = &github.BranchProtectionRuleEvent{}
-		case "check_run":
-			EventPayload = &github.CheckRunEvent{}
-		case "check_suite":
-			EventPayload = &github.CheckSuiteEvent{}
-		case "create":
-			EventPayload = &github.CreateEvent{}
-		case "delete":
-			EventPayload = &github.DeleteEvent{}
-		case "deployment":
-			EventPayload = &github.DeploymentEvent{}
-		case "deployment_status":
-			EventPayload = &github.DeploymentStatusEvent{}
-		case "discussion":
-			EventPayload = &github.DiscussionEvent{}
-		case "discussion_comment":
-			EventPayload = &github.DiscussionCommentEvent{}
-		case "fork":
-			EventPayload = &github.ForkEvent{}
-		case "gollum":
-			EventPayload = &github.GollumEvent{}
-		case "package":
-			EventPayload = &github.PackageEvent{}
-		case "issue_comment":
-			EventPayload = &github.IssueCommentEvent{}
-		case "issues":
-			EventPayload = &github.IssuesEvent{}
-		case "label":
-			EventPayload = &github.LabelEvent{}
-		case "merge_group":
-			EventPayload = &github.MergeGroupEvent{}
-		case "milestone":
-			EventPayload = &github.MilestoneEvent{}
-		case "page_build":
-			EventPayload = &github.PageBuildEvent{}
-		case "public":
-			EventPayload = &github.PublicEvent{}
-		case "pull_request":
-			EventPayload = &github.PullRequestEvent{}
-		case "pull_request_comment":
-			EventPayload = &github.IssueCommentEvent{}
-		case "pull_request_review":
-			EventPayload = &github.PullRequestReviewEvent{}
-		case "pull_request_review_comment":
-			EventPayload = &github.PullRequestReviewCommentEvent{}
-		case "pull_request_target":
-			EventPayload = &github.PullRequestTargetEvent{}
-		case "push":
-			EventPayload = &github.PushEvent{}
-		case "registry_package":
-			EventPayload = &github.RegistryPackageEvent{}
-		case "release":
-			EventPayload = &github.ReleaseEvent{}
-		case "repository":
-			EventPayload = &github.RepositoryEvent{}
-		case "repository_dispatch":
-			EventPayload = &github.RepositoryDispatchEvent{}
-		case "status":
-			EventPayload = &github.StatusEvent{}
-		case "watch":
-			EventPayload = &github.WatchEvent{}
-		case "workflow_dispatch":
-			EventPayload = &github.WorkflowDispatchEvent{}
-		case "workflow_run":
-			EventPayload = &github.WorkflowRunEvent{}
-		default:
-			EventPayload = &map[string]any{}
-		}
-
-		err = json.Unmarshal(payloadBytes, EventPayload, json.MatchCaseInsensitiveNames(true))
-
-		if err != nil {
-			EventPayload = nil
-			return fmt.Errorf("failed to unmarshal event payload: %w", err)
-		}
+// load is the testable implementation of [Load]: lookupEnv supplies the environment and fs holds the event payload file.
+func load(fs afero.Fs, lookupEnv lookupEnvFunc) (*ActionContext, error) {
+	ac := &ActionContext{
+		GithubCI:             lookupToBoolPtr(lookupEnv("CI")),
+		Action:               lookupToStr(lookupEnv("GITHUB_ACTION")),
+		ActionPath:           lookupToStr(lookupEnv("GITHUB_ACTION_PATH")),
+		ActionRepository:     lookupToStr(lookupEnv("GITHUB_ACTION_REPOSITORY")),
+		Actions:              lookupToBoolPtr(lookupEnv("GITHUB_ACTIONS")),
+		Actor:                lookupToStr(lookupEnv("GITHUB_ACTOR")),
+		ActorID:              lookupToStr(lookupEnv("GITHUB_ACTOR_ID")),
+		APIURL:               lookupToStr(lookupEnv("GITHUB_API_URL")),
+		BaseRef:              lookupToStr(lookupEnv("GITHUB_BASE_REF")),
+		EnvFilePath:          lookupToStr(lookupEnv("GITHUB_ENV")),
+		EventName:            lookupToStr(lookupEnv("GITHUB_EVENT_NAME")),
+		EventPayloadFilePath: lookupToStr(lookupEnv("GITHUB_EVENT_PATH")),
+		GraphQLURL:           lookupToStr(lookupEnv("GITHUB_GRAPHQL_URL")),
+		HeadRef:              lookupToStr(lookupEnv("GITHUB_HEAD_REF")),
+		JobID:                lookupToStr(lookupEnv("GITHUB_JOB")),
+		OutputFilePath:       lookupToStr(lookupEnv("GITHUB_OUTPUT")),
+		PathFilePath:         lookupToStr(lookupEnv("GITHUB_PATH")),
+		Ref:                  lookupToStr(lookupEnv("GITHUB_REF")),
+		RefName:              lookupToStr(lookupEnv("GITHUB_REF_NAME")),
+		RefProtected:         lookupToBoolPtr(lookupEnv("GITHUB_REF_PROTECTED")),
+		RefType:              lookupToStr(lookupEnv("GITHUB_REF_TYPE")),
+		Repository:           lookupToStr(lookupEnv("GITHUB_REPOSITORY")),
+		RepositoryID:         lookupToStr(lookupEnv("GITHUB_REPOSITORY_ID")),
+		RepositoryOwner:      lookupToStr(lookupEnv("GITHUB_REPOSITORY_OWNER")),
+		RepositoryOwnerID:    lookupToStr(lookupEnv("GITHUB_REPOSITORY_OWNER_ID")),
+		RetentionDays:        lookupToInt(lookupEnv("GITHUB_RETENTION_DAYS")),
+		RunAttempt:           lookupToInt(lookupEnv("GITHUB_RUN_ATTEMPT")),
+		RunID:                lookupToInt(lookupEnv("GITHUB_RUN_ID")),
+		RunNumber:            lookupToInt(lookupEnv("GITHUB_RUN_NUMBER")),
+		ServerURL:            lookupToStr(lookupEnv("GITHUB_SERVER_URL")),
+		Sha:                  lookupToStr(lookupEnv("GITHUB_SHA")),
+		StepSummaryFilePath:  lookupToStr(lookupEnv("GITHUB_STEP_SUMMARY")),
+		TriggeringActor:      lookupToStr(lookupEnv("GITHUB_TRIGGERING_ACTOR")),
+		Workflow:             lookupToStr(lookupEnv("GITHUB_WORKFLOW")),
+		WorkflowRef:          lookupToStr(lookupEnv("GITHUB_WORKFLOW_REF")),
+		WorkflowSha:          lookupToStr(lookupEnv("GITHUB_WORKFLOW_SHA")),
+		WorkspacePath:        lookupToStr(lookupEnv("GITHUB_WORKSPACE")),
+		RunnerArch:           lookupToStr(lookupEnv("RUNNER_ARCH")),
+		RunnerDebug:          lookupToBoolPtr(lookupEnv("RUNNER_DEBUG")),
+		RunnerEnvironment:    lookupToStr(lookupEnv("RUNNER_ENVIRONMENT")),
+		RunnerName:           lookupToStr(lookupEnv("RUNNER_NAME")),
+		RunnerOS:             lookupToStr(lookupEnv("RUNNER_OS")),
+		RunnerTempPath:       lookupToStr(lookupEnv("RUNNER_TEMP")),
+		RunnerToolCachePath:  lookupToStr(lookupEnv("RUNNER_TOOL_CACHE")),
 	}
 
-	CurrentActionContext = &ActionContext{
-		GithubCI:             GithubCI,
-		Action:               Action,
-		ActionPath:           ActionPath,
-		ActionRepository:     ActionRepository,
-		Actions:              Actions,
-		Actor:                Actor,
-		ActorID:              ActorID,
-		APIURL:               APIURL,
-		BaseRef:              BaseRef,
-		EnvFilePath:          EnvFilePath,
-		EventName:            EventName,
-		EventPayloadFilePath: EventPayloadFilePath,
-		GraphQLURL:           GraphQLURL,
-		HeadRef:              HeadRef,
-		JobID:                JobID,
-		OutputFilePath:       OutputFilePath,
-		PathFilePath:         PathFilePath,
-		Ref:                  Ref,
-		RefName:              RefName,
-		RefProtected:         RefProtected,
-		RefType:              RefType,
-		Repository:           Repository,
-		RepositoryID:         RepositoryID,
-		RepositoryOwner:      RepositoryOwner,
-		RepositoryOwnerID:    RepositoryOwnerID,
-		RetentionDays:        RetentionDays,
-		RunAttempt:           RunAttempt,
-		RunID:                RunID,
-		RunNumber:            RunNumber,
-		ServerURL:            ServerURL,
-		Sha:                  Sha,
-		StepSummaryFilePath:  StepSummaryFilePath,
-		TriggeringActor:      TriggeringActor,
-		Workflow:             Workflow,
-		WorkflowRef:          WorkflowRef,
-		WorkflowSha:          WorkflowSha,
-		WorkspacePath:        WorkspacePath,
-		RunnerArch:           RunnerArch,
-		RunnerDebug:          RunnerDebug,
-		RunnerEnvironment:    RunnerEnvironment,
-		RunnerName:           RunnerName,
-		RunnerOS:             RunnerOS,
-		RunnerTempPath:       RunnerTempPath,
-		RunnerToolCachePath:  RunnerToolCachePath,
-		EventPayload:         EventPayload,
-		rawEventPayload:      rawPayload,
+	if ac.EventName == "" || ac.EventPayloadFilePath == "" {
+		return ac, nil
 	}
 
-	return nil
+	payloadBytes, err := afero.ReadFile(fs, ac.EventPayloadFilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read event payload file: %w", err)
+	}
+
+	payload := newEventPayload(ac.EventName)
+	if err := json.Unmarshal(payloadBytes, payload, json.MatchCaseInsensitiveNames(true)); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal event payload: %w", err)
+	}
+	ac.EventPayload = payload
+	ac.rawEventPayload = stdjson.RawMessage(payloadBytes)
+
+	return ac, nil
+}
+
+// newEventPayload returns a pointer to the go-github type for the named event, or to a map for an event without one.
+func newEventPayload(eventName string) any {
+	switch eventName {
+	case "branch_protection_rule":
+		return &github.BranchProtectionRuleEvent{}
+	case "check_run":
+		return &github.CheckRunEvent{}
+	case "check_suite":
+		return &github.CheckSuiteEvent{}
+	case "create":
+		return &github.CreateEvent{}
+	case "delete":
+		return &github.DeleteEvent{}
+	case "deployment":
+		return &github.DeploymentEvent{}
+	case "deployment_status":
+		return &github.DeploymentStatusEvent{}
+	case "discussion":
+		return &github.DiscussionEvent{}
+	case "discussion_comment":
+		return &github.DiscussionCommentEvent{}
+	case "fork":
+		return &github.ForkEvent{}
+	case "gollum":
+		return &github.GollumEvent{}
+	case "package":
+		return &github.PackageEvent{}
+	case "issue_comment":
+		return &github.IssueCommentEvent{}
+	case "issues":
+		return &github.IssuesEvent{}
+	case "label":
+		return &github.LabelEvent{}
+	case "merge_group":
+		return &github.MergeGroupEvent{}
+	case "milestone":
+		return &github.MilestoneEvent{}
+	case "page_build":
+		return &github.PageBuildEvent{}
+	case "public":
+		return &github.PublicEvent{}
+	case "pull_request":
+		return &github.PullRequestEvent{}
+	case "pull_request_review":
+		return &github.PullRequestReviewEvent{}
+	case "pull_request_review_comment":
+		return &github.PullRequestReviewCommentEvent{}
+	case "pull_request_target":
+		return &github.PullRequestTargetEvent{}
+	case "push":
+		return &github.PushEvent{}
+	case "registry_package":
+		return &github.RegistryPackageEvent{}
+	case "release":
+		return &github.ReleaseEvent{}
+	case "repository":
+		return &github.RepositoryEvent{}
+	case "repository_dispatch":
+		return &github.RepositoryDispatchEvent{}
+	case "status":
+		return &github.StatusEvent{}
+	case "watch":
+		return &github.WatchEvent{}
+	case "workflow_dispatch":
+		return &github.WorkflowDispatchEvent{}
+	case "workflow_run":
+		return &github.WorkflowRunEvent{}
+	default:
+		return &map[string]any{}
+	}
 }
 
 // lookupToStr converts lookupEnv results to a string value.
