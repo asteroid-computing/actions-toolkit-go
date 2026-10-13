@@ -131,6 +131,19 @@ func SetState(key, value string) error {
 	return fc.Send()
 }
 
+// GetState returns the value saved with [SetState] under name, read from the STATE_<name> environment variable the runner sets for the action's pre and post steps.
+// It returns an empty string when no such state was saved.
+// GitHub Command Reference: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#sending-values-to-the-pre-and-post-actions
+func GetState(name string) string {
+	return getState(os.LookupEnv, name)
+}
+
+// getState is the testable implementation of [GetState].
+func getState(lookupEnv lookupEnvFunc, name string) string {
+	v, _ := lookupEnv("STATE_" + name)
+	return v
+}
+
 // AddToPath executes a GitHub Workflow command to add a directory to the system PATH for subsequent workflow steps,
 // and prepends it to the current process's PATH so code later in this step finds its executables too, as the JS toolkit's addPath does.
 // Unlike addPath, the current process is changed only after the runner file is written, so a failed call changes nothing.
