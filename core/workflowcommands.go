@@ -3,7 +3,9 @@ package core
 import (
 	"fmt"
 	"io"
+	"maps"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"uuid"
@@ -46,6 +48,7 @@ func NewWorkflowCommand(w io.Writer, command string, properties map[string]strin
 }
 
 // String renders the workflow command into the GitHub Actions command syntax.
+// Properties are rendered in sorted key order, so the same command always renders the same string.
 // GitHub Workflow Command Reference: https://docs.github.com/actions/using-workflows/workflow-commands-for-github-actions#about-workflow-commands
 func (wc *WorkflowCommand) String() string {
 	var cmdStr strings.Builder
@@ -54,15 +57,12 @@ func (wc *WorkflowCommand) String() string {
 
 	if len(wc.properties) > 0 {
 		cmdStr.WriteString(" ")
-		isFirst := true
-		for k, v := range wc.properties {
-			if !isFirst {
+		for i, k := range slices.Sorted(maps.Keys(wc.properties)) {
+			if i > 0 {
 				cmdStr.WriteString(",")
 			}
 
-			fmt.Fprintf(&cmdStr, "%s=%s", k, escapeCommandParameter(v))
-
-			isFirst = false
+			fmt.Fprintf(&cmdStr, "%s=%s", k, escapeCommandParameter(wc.properties[k]))
 		}
 	}
 

@@ -17,7 +17,7 @@ You need Go 1.27 or later, and nothing else: the developer tasks are a Go progra
 
 ## Making a change
 
-- Read [AGENTS.md](AGENTS.md). It describes the layout, the library's conventions (injectable `afero.Fs` and `LookupEnvFunc`, table-driven tests) and the tooling rules.
+- Read [AGENTS.md](AGENTS.md). It describes the layout, the library's conventions (injectable filesystem and environment lookups behind each exported function, table-driven tests) and the tooling rules.
 - Add or update tests with every change. Library code is tested without touching the real environment or disk.
 - Exported identifiers need [doc comments](https://go.dev/doc/comment), linking the GitHub reference for any workflow command they implement.
 - Keep a pull request to one logical change.

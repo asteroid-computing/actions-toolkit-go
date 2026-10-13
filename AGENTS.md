@@ -10,10 +10,10 @@ These rules are binding for humans and agents working here.
 ## The library
 
 - **Go 1.27 or later.** `encoding/json/v2` and the `uuid` package are standard library in 1.27, so the library needs no `GOEXPERIMENT` and no third-party UUID module.
-- **Testable by injection.** Exported functions are thin wrappers over unexported implementations that take an `afero.Fs` and a `LookupEnvFunc` (e.g. `getInput(lookupEnv, …)`, `buildFileCommand(fs, lookupEnv, uuidFunc, …)`, `loadActionContext(fs, lookupEnv)`). Tests use `afero.NewMemMapFs()` and a map-backed lookup; never the real environment or disk.
+- **Testable by injection.** Exported functions are thin wrappers over unexported implementations that take an `afero.Fs` and a `lookupEnvFunc` (e.g. `getInput(lookupEnv, …)`, `buildFileCommand(fs, lookupEnv, uuidFunc, …)`, `load(fs, lookupEnv)`). Tests use `afero.NewMemMapFs()` and a map-backed lookup; never the real environment or disk. afero stays out of every exported signature, so consumers do not depend on it.
 - **Table-driven tests**, success and error paths both (unset env vars, invalid input, missing files).
 - **Doc comments follow [Go Doc Comments](https://go.dev/doc/comment)** and link the GitHub reference for each workflow command. `docs/github-workflow-variables.md` lists the default environment variables `actioncontext` reads.
-- **`actioncontext` populates itself in `init()`** and logs the context as a `::debug::` line. Import it only from action binaries, never from `cmd/walle` (it would print on every walle run and link go-github into the task runner); the repository's own actions use `core` only.
+- **No import-time work beyond reading the environment.** `actioncontext` does nothing until `Load()` is called; it holds no package-level state. (`core.StepSummary` only records the `GITHUB_STEP_SUMMARY` path when the package loads.) `actioncontext` links go-github, so keep it out of `cmd/walle`; the repository's own actions use `core` only.
 - **go-github is part of the public API** (`EventPayload` and the typed accessors return `github.com/google/go-github/v92` types). Bumping its major version is a breaking change; `RawEventPayload` is the escape hatch for consumers on another major.
 - **`cmd/example` is the library's release component.** It imports both `core` and `actioncontext`, which puts the library in its build closure, so a change to either package is in CI's vet, test and build scope. Keep both imports.
 
@@ -124,13 +124,13 @@ release-please acts as the org's `astrocompute-release-please` GitHub App, not w
 
 ## How to…
 
-**Add to the library.** Put the exported function in `core` or `actioncontext` as a thin wrapper over an unexported, injectable implementation, with table-driven tests against `afero.NewMemMapFs()` and a map-backed `LookupEnvFunc`. Link the GitHub reference in its doc comment. Match the JS toolkit's behaviour where one exists, and say so in the comment when it deliberately differs.
+**Add to the library.** Put the exported function in `core` or `actioncontext` as a thin wrapper over an unexported, injectable implementation, with table-driven tests against `afero.NewMemMapFs()` and a map-backed `lookupEnvFunc`. Link the GitHub reference in its doc comment. Match the JS toolkit's behaviour where one exists, and say so in the comment when it deliberately differs.
 
 **Add a walle command.** Add a struct with `Run(ctx context.Context) error` in `cmd/walle`, add a field to `CLI` in `main.go` with `cmd:"" group:"<develop|build|inspect|maintain>" help:"…"`. If the logic is something CI also needs, put it in `internal/` and keep the command a shell. Field order within a group is display order.
 
 **Add a component.** Create `cmd/<name>/main.go` (import `version` so build metadata is linked — `TestEveryComponentLinksVersion` enforces it). Add `{Name: "<name>", EntryPkg: "./cmd/<name>", BuildTags: …}` to `buildscope.Components`. walle's enums, `changed`, `closure`, `build`, the changed-scope outputs and the build action all pick it up; no YAML changes.
 
-**Add a Go action.** Create `cmd/github-actions/<name>/main.go` using this repository's `core` package for inputs, outputs, annotations and the step summary (not `actioncontext`, whose `init()` logs; read the few `GITHUB_*` variables an action needs directly); put the logic in `internal/` with tests. Create `.github/actions/<name>/action.yaml` (`using: node24`, `main: index.js`) and `.github/actions/<name>/index.js` containing `require("../_shim/shim.js")(__dirname);`. Prefer component-agnostic outputs (lists, JSON) so the action needs no edit when components change. Optionally `./walle build actions` and commit `dist/`.
+**Add a Go action.** Create `cmd/github-actions/<name>/main.go` using this repository's `core` package for inputs, outputs, annotations and the step summary (not `actioncontext`, which would link go-github into the action; read the few `GITHUB_*` variables an action needs directly); put the logic in `internal/` with tests. Create `.github/actions/<name>/action.yaml` (`using: node24`, `main: index.js`) and `.github/actions/<name>/index.js` containing `require("../_shim/shim.js")(__dirname);`. Prefer component-agnostic outputs (lists, JSON) so the action needs no edit when components change. Optionally `./walle build actions` and commit `dist/`.
 
 **Add a project-wide go setting.** Add it to `gocmd.Env`. Add it to the workflow `env:` only if a step outside walle/actions needs it.
 

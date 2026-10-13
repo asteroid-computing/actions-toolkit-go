@@ -1,6 +1,6 @@
 # Default environment variables
 
-`actioncontext` reads the default environment variables that GitHub Actions sets for every step. This table maps each one to its `ActionContext` field (and the package-level variable of the same name). GitHub's [variables reference](https://docs.github.com/en/actions/reference/workflows-and-actions/variables#default-environment-variables) is authoritative for what each variable means and when it is set.
+`actioncontext` reads the default environment variables that GitHub Actions sets for every step. `actioncontext.Load()` returns them as an `ActionContext`; this table maps each variable to its field. GitHub's [variables reference](https://docs.github.com/en/actions/reference/workflows-and-actions/variables#default-environment-variables) is authoritative for what each variable means and when it is set.
 
 Unset variables leave strings empty and `*bool` fields nil; integer fields are 0 when unset or unparsable. Booleans parse with `strconv.ParseBool`, so `RUNNER_DEBUG=1` is true.
 

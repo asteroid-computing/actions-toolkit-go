@@ -88,8 +88,7 @@ func (ac *ActionContext) PackageEvent() (*github.PackageEvent, bool) {
 
 // IssueCommentEvent returns the event payload as a [github.IssueCommentEvent]
 // and reports whether the current event is of that type.
-// This accessor covers both the issue_comment and pull_request_comment event names,
-// as both use the same payload type.
+// GitHub sends comments on pull requests as issue_comment events too; check the payload's Issue.IsPullRequest to tell them apart.
 func (ac *ActionContext) IssueCommentEvent() (*github.IssueCommentEvent, bool) {
 	e, ok := ac.EventPayload.(*github.IssueCommentEvent)
 	return e, ok

@@ -63,7 +63,7 @@ func GetMultilineInput(name string, opts *InputOptions) ([]string, error) {
 
 // getInput is the testable implementation of [GetInput].
 // lookupEnv is called with the resolved env var key INPUT_<NAME>.
-func getInput(lookupEnv LookupEnvFunc, name string, opts *InputOptions) (string, error) {
+func getInput(lookupEnv lookupEnvFunc, name string, opts *InputOptions) (string, error) {
 	if opts == nil {
 		opts = &InputOptions{}
 	}
@@ -81,7 +81,7 @@ func getInput(lookupEnv LookupEnvFunc, name string, opts *InputOptions) (string,
 }
 
 // getBooleanInput is the testable implementation of [GetBooleanInput].
-func getBooleanInput(lookupEnv LookupEnvFunc, name string, opts *InputOptions) (bool, error) {
+func getBooleanInput(lookupEnv lookupEnvFunc, name string, opts *InputOptions) (bool, error) {
 	val, err := getInput(lookupEnv, name, opts)
 	if err != nil {
 		return false, err
@@ -97,7 +97,7 @@ func getBooleanInput(lookupEnv LookupEnvFunc, name string, opts *InputOptions) (
 }
 
 // getMultilineInput is the testable implementation of [GetMultilineInput].
-func getMultilineInput(lookupEnv LookupEnvFunc, name string, opts *InputOptions) ([]string, error) {
+func getMultilineInput(lookupEnv lookupEnvFunc, name string, opts *InputOptions) ([]string, error) {
 	if opts == nil {
 		opts = &InputOptions{}
 	}

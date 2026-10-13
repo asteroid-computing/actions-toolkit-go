@@ -24,7 +24,10 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	ac := actioncontext.CurrentActionContext
+	ac, err := actioncontext.Load()
+	if err != nil {
+		return err
+	}
 	greeting := greet(who, ac.Actor, ac.Repository)
 	fmt.Println(greeting)
 
