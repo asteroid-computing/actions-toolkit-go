@@ -12,7 +12,7 @@ The API is not yet stable: while the version is below 1.0.0, a minor release may
 
 ## Packages
 
-- **`core`** — inputs (`GetInput`, `GetBooleanInput`, `GetMultilineInput`), outputs and file commands (`SetOutput`, `SetEnv`, `SetState`/`GetState`, `AddToPath`), logging and workflow commands (`Info`, `Debug`, `Notice`, `Warning`, `Error`, `Group`, `StartGroup`/`EndGroup`, `MaskValue`, `StopCommands`, `IsDebug`), failing the step (`SetFailed`) and the job summary builder (`StepSummary`).
+- **`core`** — inputs (`GetInput`, `GetBooleanInput`, `GetMultilineInput`), outputs and file commands (`SetOutput`, `SetEnv`, `SetState`/`GetState`, `AddToPath`), logging and workflow commands (`Info`, `Debug`, `Notice`, `Warning`, `Error`, `Group`, `StartGroup`/`EndGroup`, `MaskValue`, `StopCommands`, `IsDebug`), failing the step (`SetFailed`), GitHub OIDC ID tokens for keyless cloud authentication (`GetIDToken`) and the job summary builder (`StepSummary`).
 - **`actioncontext`** — the run's context, read by `actioncontext.Load()` from the [default environment variables](docs/github-workflow-variables.md), with the event payload decoded into the matching [go-github](https://github.com/google/go-github) type (`PullRequestEvent()`, `PushEvent()`, …), the raw payload (`RawEventPayload()`), and `NewGitHubClient` targeting the run's API host (github.com or GHES).
 
 ```go
