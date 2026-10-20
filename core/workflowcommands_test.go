@@ -177,3 +177,18 @@ func (f *failAfter) Write(p []byte) (int, error) {
 	f.n--
 	return f.w.Write(p)
 }
+
+func TestSetCommandEcho(t *testing.T) {
+	for enabled, want := range map[bool]string{true: "::echo::on\n", false: "::echo::off\n"} {
+		var buf bytes.Buffer
+		if err := setCommandEcho(&buf, enabled); err != nil {
+			t.Fatalf("setCommandEcho(%v) returned error: %v", enabled, err)
+		}
+		if got := buf.String(); got != want {
+			t.Errorf("setCommandEcho(%v) wrote %q, want %q", enabled, got, want)
+		}
+	}
+	if err := setCommandEcho(failingWriter{}, true); err == nil {
+		t.Error("setCommandEcho returned nil for a failing writer")
+	}
+}

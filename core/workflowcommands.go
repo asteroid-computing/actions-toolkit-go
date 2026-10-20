@@ -25,6 +25,7 @@ const (
 	EndGroupCommandStr     = "endgroup"
 	MaskCommandStr         = "add-mask"
 	StopCommandsCommandStr = "stop-commands"
+	EchoCommandStr         = "echo"
 )
 
 // WorkflowCommand represents a formatted GitHub Actions workflow command
@@ -229,6 +230,23 @@ func group(w io.Writer, name string, fn func() error) error {
 	endErr := NewWorkflowCommand(w, EndGroupCommandStr, nil, "").Send()
 
 	return errors.Join(fnErr, endErr)
+}
+
+// SetCommandEcho turns echoing of workflow commands in the log on or off for the current step, as the JS toolkit's setCommandEcho does.
+// By default commands are echoed only when step debug logging is enabled. The add-mask, debug, warning and error commands are never echoed.
+// The echo command is documented in the JS toolkit rather than GitHub's workflow command reference: https://github.com/actions/toolkit/blob/main/docs/commands.md#command-echoing
+func SetCommandEcho(enabled bool) error {
+	return setCommandEcho(os.Stdout, enabled)
+}
+
+// setCommandEcho is the testable implementation of [SetCommandEcho].
+func setCommandEcho(w io.Writer, enabled bool) error {
+	state := "off"
+	if enabled {
+		state = "on"
+	}
+
+	return NewWorkflowCommand(w, EchoCommandStr, nil, state).Send()
 }
 
 // MaskValue instructs GitHub Actions to redact the provided value from logs.

@@ -136,6 +136,7 @@ func TestSetCommandsWriteUsingEnvPaths(t *testing.T) {
 	}{
 		{name: "set env", env: EnvironmentVariableFilePathEnv, fn: func(path string) error { return SetEnv("ABC", "123") }, want: "ABC<<"},
 		{name: "set output", env: OutputFilePathEnv, fn: func(path string) error { return SetOutput("RESULT", "ok") }, want: "RESULT<<"},
+		{name: "set output json", env: OutputFilePathEnv, fn: func(path string) error { return SetOutputJSON("TARGETS", []string{"a", "b"}) }, want: "TARGETS<<"},
 		{name: "set state", env: GithubStateFilePathEnv, fn: func(path string) error { return SetState("STATE", "done") }, want: "STATE<<"},
 		{name: "add to path", env: SystemPathFilePathEnv, fn: func(path string) error { return AddToPath("/tmp/bin") }, want: "/tmp/bin" + OsSpecificNewline},
 	}
@@ -322,5 +323,38 @@ func TestGetState(t *testing.T) {
 		if got := getState(fakeLookup(env), tt.name); got != tt.want {
 			t.Errorf("getState(%q) = %q, want %q", tt.name, got, tt.want)
 		}
+	}
+}
+
+func TestJSONCommandValue(t *testing.T) {
+	type build struct {
+		Name    string   `json:"name"`
+		Targets []string `json:"targets,omitempty"`
+		Count   int      `json:"count,omitempty"`
+	}
+	tests := []struct {
+		name    string
+		v       any
+		want    string
+		wantErr bool
+	}{
+		{name: "struct uses its json tags", v: build{Name: "api", Count: 0}, want: `{"name":"api"}`},
+		{name: "map keys are sorted", v: map[string]int{"zeta": 1, "alpha": 2, "mid": 3}, want: `{"alpha":2,"mid":3,"zeta":1}`},
+		{name: "slice", v: []string{"linux/amd64", "linux/arm64"}, want: `["linux/amd64","linux/arm64"]`},
+		{name: "a string is quoted", v: "plain", want: `"plain"`},
+		{name: "nil", v: nil, want: `null`},
+		{name: "HTML characters are escaped", v: "a<b>&c", want: "\"a\\u003cb\\u003e\\u0026c\""},
+		{name: "unencodable value", v: make(chan int), wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := jsonCommandValue(tt.v)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("jsonCommandValue error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if got != tt.want {
+				t.Errorf("jsonCommandValue = %s, want %s", got, tt.want)
+			}
+		})
 	}
 }
