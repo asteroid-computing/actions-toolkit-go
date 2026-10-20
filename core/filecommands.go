@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -117,6 +118,29 @@ func SetOutput(key, value string) error {
 	}
 
 	return fc.Send()
+}
+
+// SetOutputJSON sets a step output to v encoded as JSON, for a workflow to read with fromJSON(steps.<id>.outputs.<name>), as the JS toolkit's setOutput does for a value that is not a string.
+// v is encoded with encoding/json, so it follows the same struct tags as elsewhere; map keys are sorted, and <, > and & are written as \u003c, \u003e and \u0026, which fromJSON reads back unchanged.
+// A string is encoded as a quoted JSON string; use [SetOutput] to set a plain string output.
+// GitHub Command Reference: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-output-parameter
+func SetOutputJSON(key string, v any) error {
+	value, err := jsonCommandValue(v)
+	if err != nil {
+		return err
+	}
+
+	return SetOutput(key, value)
+}
+
+// jsonCommandValue encodes v as the JSON text of a command value.
+func jsonCommandValue(v any) (string, error) {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return "", fmt.Errorf("encoding value as JSON: %w", err)
+	}
+
+	return string(b), nil
 }
 
 // SetState executes a GitHub Workflow command to set a state parameter which is available to post-actions
