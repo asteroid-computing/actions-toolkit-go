@@ -3,7 +3,7 @@ module github.com/asteroid-computing/actions-toolkit-go
 go 1.27.0
 
 require (
-	github.com/alecthomas/kong v1.16.1
+	github.com/alecthomas/kong v1.17.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/go-github/v92 v92.0.0
 	github.com/spf13/afero v1.15.0
